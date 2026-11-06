@@ -1,0 +1,32 @@
+# Author: François Guillemette
+# CrazyVideoGenerator .gitignore
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Model checkpoints and weights
+models/*
+!models/.gitkeep
+
+# Output videos and previews
+outputs/*
+!outputs/.gitkeep
+
+# Testing and caches
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

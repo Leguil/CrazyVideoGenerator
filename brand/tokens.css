@@ -1,0 +1,320 @@
+/*
+ * CrazyLogix design tokens — "Insanely Simple".
+ *
+ * The shared chrome palette for every CrazyLogix application. Import it; never
+ * copy it (see README.md). An application keeps its own local variable names and
+ * points them here, so adoption is one line per token and reversible in a commit.
+ *
+ * Every value below is traceable to something, not chosen:
+ *
+ *  - The accent is the mark. crazylogix_logo.svg is a single fill,
+ *    rgb(14,107,63) = #0e6b3f, which index.html's config calls "Primary
+ *    CrazyLogix Green". Its hover/active/ring steps are that config's
+ *    crazylogix-700/800/500.
+ *  - The neutrals are the slate family the showcase is built on, and the
+ *    surface.light / surface.dark / panelLight / panelDark values it declares.
+ *  - The mark colour for overlays is brand-600 (#026fc5), the showcase's
+ *    secondary. It exists so a mark drawn over the user's own artwork cannot be
+ *    mistaken for a piece of application chrome.
+ *  - The radius is rounded-lg (8px), which is 35 of the showcase's 81 rounded-*
+ *    classes and already what Image to SVG had.
+ *  - The status colours are NOT from the mark. Red means failure everywhere, and
+ *    bending it to a brand would cost more than it buys.
+ *
+ * This layer stops at the CHROME — toolbars, panels, rails, dialogs, buttons.
+ * It must never style a document: Markdown Studio's document appearance comes
+ * from the user's own theme JSON (--md-*), and brand colours there would print
+ * CrazyLogix's palette on somebody else's page.
+ *
+ * DARK THEME. The dark block at the bottom of this file is opt-in, under an
+ * explicit selector only — :root[data-theme="dark"], body[data-theme="dark"], or
+ * .dark. It is never attached to prefers-color-scheme, which would silently
+ * repaint a light-only app. It overrides every COLOUR token and both shadows;
+ * type, radius and spacing are theme-invariant and are deliberately not repeated.
+ *
+ * PAIRING RULE. Any token named *-text, *-on-* or *-chrome-text is the ink for
+ * a specific ground, and the two move together. If a ground is re-toned in one
+ * theme, its ink must be re-toned in the same edit — a light-theme ink carried
+ * unchanged into the dark block is the failure this rule exists to prevent.
+ * Every ink/ground pair below is verified at >= 4.5:1, and every non-text
+ * indicator (frame, ring, border-strong) at >= 3:1, in both themes.
+ *
+ * This layer stops at the CHROME — toolbars, panels, rails, dialogs. It must
+ * never style a document: Markdown Studio's document appearance comes from the
+ * user's own theme JSON (--md-*), and brand colours there would print
+ * CrazyLogix's palette on somebody else's page.
+ *
+ * DARK THEME. The dark block at the bottom of this file is opt-in, under an
+ * explicit selector only — :root[data-theme="dark"], body[data-theme="dark"], or
+ * .dark. It is never attached to prefers-color-scheme, which would silently
+ * repaint a light-only app. It overrides every COLOUR token and both shadows;
+ * type, radius and spacing are theme-invariant and are deliberately not repeated.
+ *
+ * PAIRING RULE. Any token named *-text, *-on-* or *-chrome-text is the ink for
+ * a specific ground, and the two move together. If a ground is re-toned in one
+ * theme, its ink must be re-toned in the same edit — a light-theme ink carried
+ * unchanged into the dark block is the failure this rule exists to prevent.
+ * Every ink/ground pair below is verified at >= 4.5:1, and every non-text
+ * indicator (frame, ring, border-strong) at >= 3:1, in both themes.
+ */
+
+:root {
+  /* ------------------------------------------------------------ typography */
+  /* Inter and JetBrains Mono are the brand faces. Neither is bundled by every
+     app, and the showcase pulls them from Google Fonts, which the products
+     forbid at runtime — so both stacks degrade to the platform UI face rather
+     than depending on a webfont. An app that bundles @fontsource/inter gets the
+     real thing for free. */
+  --cl-font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --cl-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, Consolas, monospace;
+
+  /* ---------------------------------------------------------------- shape */
+  --cl-radius-sm: 6px;
+  --cl-radius: 8px;
+  --cl-radius-lg: 12px;
+  --cl-radius-pill: 999px;
+
+  --cl-space-xs: 4px;
+  --cl-space-sm: 8px;
+  --cl-space-md: 12px;
+  --cl-space-lg: 16px;
+  --cl-space-xl: 24px;
+  --cl-space-2xl: 32px;
+
+  /* Elevation is a cast shadow on a light ground. The dark block re-states both:
+     black at 5% over #0b0f19 is not a faint shadow, it is no shadow at all. */
+  --cl-shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --cl-shadow-elevated: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
+
+  /* -------------------------------------------------------------- surfaces */
+  --cl-surface: #f1f5f9;         /* the page ground */
+  --cl-panel: #ffffff;           /* a panel sitting on it */
+  --cl-panel-sunken: #f8fafc;    /* an inset area inside a panel */
+  --cl-checker: #e2e8f0;         /* transparency checkerboard squares — must
+                                     differ from --cl-panel, the other square */
+
+  /* The scrim behind a modal. Dialogs are in this layer's scope, so the backdrop
+     belongs here: it is the one token an app cannot guess, because the value
+     that dims a white page washes out a near-black one. */
+  --cl-scrim: rgba(15, 23, 42, 0.55);
+  --cl-scrim-strong: rgba(15, 23, 42, 0.72);
+
+  /* ------------------------------------------------------------------ text */
+  --cl-text: #1e293b;
+  --cl-text-strong: #0f172a;
+  --cl-muted: #5b6a80;           /* slate-500 taken one step down: #64748b read
+                                     at 4.34:1 on --cl-surface, just under 4.5 */
+
+  /* ----------------------------------------------------------------- lines */
+  --cl-border: #e2e8f0;
+  --cl-border-strong: #cbd5e1;
+
+  /* ------------------------------------------------------------------ frame
+     The signature CrazyLogix green frame. Every application window,
+     header chrome bar, and primary boundary is framed in Primary Green
+     (#0e6b3f) to provide instant visual identity across all tools. */
+  --cl-frame-border: #0e6b3f;
+  --cl-frame-border-subtle: rgba(14, 107, 63, 0.4);
+  --cl-frame-glow: 0 0 16px rgba(14, 107, 63, 0.35);
+  --cl-frame-top-bar: #0e6b3f;
+  --cl-frame-width: 3px;
+  --cl-card-frame: #0e6b3f;
+  --cl-panel-border: #0e6b3f;
+
+  /* ----------------------------------------------------------------- chrome
+     The application bar. Dark in both themes: it frames the work rather than
+     being part of it, and the green accent border frames it on all applications.
+
+     Because the bar is near-black in BOTH themes, its border cannot be the same
+     green as the frame on a light page: #0e6b3f sits at 2.71:1 on #0f172a. The
+     bar gets the lifted green, which is also what the dark theme's frame uses —
+     so the two agree there and --cl-chrome-border needs no dark override. */
+  --cl-chrome: #0f172a;
+  --cl-chrome-text: #f1f5f9;
+  --cl-chrome-muted: #94a3b8;
+  --cl-chrome-dim: #8494ab;      /* the faintest legible ink on the bar; #64748b
+                                     read at 3.07:1 on --cl-chrome-control */
+  --cl-chrome-control: #1e293b;  /* a control's ground on the bar */
+  --cl-chrome-border: #16a34a;   /* Signature CrazyLogix Green Frame, lifted to
+                                     clear 4.5:1 against the bar it frames */
+
+  /* ----------------------------------------------------------------- accent
+     The mark's green. Primary actions, focus, selection, anything the brand
+     signs. The ramp lifts on hover and sinks on press; the dark block mirrors
+     that shape around its own, lighter base rather than reusing these steps. */
+  --cl-accent: #0e6b3f;
+  --cl-accent-hover: #15803d;
+  --cl-accent-active: #166534;
+  --cl-accent-ring: #16a34a;
+  --cl-accent-text: #ffffff;        /* on a filled accent */
+  --cl-accent-text-muted: #bbf7d0;  /* secondary text on a filled accent */
+  --cl-accent-soft: #f0fdf4;        /* accent-tinted ground */
+  --cl-accent-soft-border: #bbf7d0;
+  --cl-accent-on-soft: #14532d;
+
+  /* ------------------------------------------------------------------ marks
+     A second hue, for marks drawn OVER the user's own content — a selected
+     path, a proposed pair, an unsaved dot. Distinct from the accent on purpose:
+     these must not read as application chrome. */
+  --cl-mark: #026fc5;
+  --cl-mark-soft: #e8f3ff;       /* one step lighter than #e0effe, which put the
+                                     mark on its own ground at 4.40:1 */
+
+  /* ---------------------------------------------------------------- status
+     Not brand colours. Conventional meanings, kept conventional.
+
+     Success is emerald, deliberately one step off the brand's forest green, so a
+     success callout cannot be misread as a branded surface. Warning is amber,
+     which the accent cannot stand in for at all — it was the one state with no
+     token, and an app needing it had no choice but to hardcode a hex.
+
+     Each state has two forms, and every ink is named for the ground it sits on:
+
+       SOFT   -bg / -border / -text            a callout, a badge, a tinted panel
+       SOLID  base / -hover / -active / -on    a filled button, a dot, a meter
+
+     `-text` is the ink on the soft ground; `-on` is the ink on the solid fill.
+     Info has no solid form because nothing fills with it — adding one is four
+     lines, and shipping values nobody renders is how the dark block got broken. */
+  --cl-info-bg: #f0f7ff;
+  --cl-info-border: #bae0fd;
+  --cl-info-text: #0c3f6d;
+
+  --cl-success-bg: #ecfdf5;
+  --cl-success-border: #a7f3d0;
+  --cl-success-text: #065f46;
+  --cl-success: #15803d;
+  --cl-success-hover: #166534;
+  --cl-success-active: #14532d;
+  --cl-success-on: #ffffff;
+
+  --cl-warn-bg: #fffbeb;
+  --cl-warn-border: #fde68a;
+  --cl-warn-text: #92400e;
+  /* Amber takes a dark ink, never white: #ffffff on #f59e0b is 2.15:1. So this
+     ramp lifts on hover and sinks on press around a light base — the same shape
+     the dark accent uses, for the same reason. */
+  --cl-warn: #f59e0b;
+  --cl-warn-hover: #fbbf24;
+  --cl-warn-active: #d97706;
+  --cl-warn-on: #2b1600;
+
+  --cl-danger-bg: #fef2f2;
+  --cl-danger-border: #fecaca;
+  --cl-danger-text: #991b1b;
+  /* Danger lifts and its ink flips dark, exactly like the accent: #ffffff on the
+     light block's #dc2626 is fine at 4.83:1, but on a dark-theme red bright
+     enough to read against #0b0f19 it collapses to 2.77:1. */
+  --cl-danger: #dc2626;
+  --cl-danger-hover: #b91c1c;
+  --cl-danger-active: #991b1b;
+  --cl-danger-on: #ffffff;
+}
+
+/* ------------------------------------------------------------------ dark theme
+   The dark chrome & panel palette. Enabled via an explicit selector:
+   :root[data-theme="dark"], body[data-theme="dark"], or .dark on <html> / <body>.
+   Renders deep slate surfaces and crisp, high-contrast text, and keeps the
+   signature CrazyLogix Green Frame — lifted to #16a34a, because #0e6b3f sits at
+   2.91:1 on this ground and the frame IS the boundary here: --cl-chrome and
+   --cl-surface are both near-black and cannot separate by tone.
+
+   Two things FLIP rather than merely darken, and they are why the pairing rule
+   in the header exists:
+
+     - The accent lifts to emerald (#10b981) so it reads on a near-black ground,
+       which means the ink ON the accent must go DARK. Carrying #ffffff across
+       from the light block gives 2.54:1 on a primary button — under the 3:1
+       floor for any text at all. android.html's Material scheme already does it
+       correctly (--m3-primary #87d5a3 / --m3-on-primary #00391d).
+     - The ramp mirrors: hover lifts to #34d399, press sinks to #0ea371, so one
+       ink clears 4.5:1 on all three states. Copying the light ramp's absolute
+       steps would have walked the button down into the page. */
+:root[data-theme="dark"],
+body[data-theme="dark"],
+.dark {
+  /* elevation — black at 5% is invisible here; a dark UI needs real depth */
+  --cl-shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.55);
+  --cl-shadow-elevated: 0 10px 20px -4px rgb(0 0 0 / 0.65), 0 4px 8px -2px rgb(0 0 0 / 0.5);
+
+  /* surfaces */
+  --cl-surface: #0b0f19;         /* slate-950 deep ground */
+  --cl-panel: #1e293b;           /* slate-800 elevated panel */
+  --cl-panel-sunken: #0f172a;    /* slate-900 inset area */
+  --cl-checker: #334155;         /* slate-700 — must NOT equal --cl-panel, or the
+                                     checkerboard vanishes into the panel */
+
+  --cl-scrim: rgba(2, 4, 9, 0.7);
+  --cl-scrim-strong: rgba(2, 4, 9, 0.85);
+
+  /* text */
+  --cl-text: #e2e8f0;            /* slate-200 */
+  --cl-text-strong: #f8fafc;     /* slate-50 */
+  --cl-muted: #94a3b8;           /* slate-400 */
+
+  /* lines */
+  --cl-border: #334155;          /* slate-700 */
+  --cl-border-strong: #475569;   /* slate-600 */
+
+  /* frame - signature CrazyLogix green, lifted for the dark ground. All six move
+     together: the glow was already emerald while the border it belonged to was
+     still forest, so the frame and its own halo were two different greens. */
+  --cl-frame-border: #16a34a;
+  --cl-frame-border-subtle: rgba(22, 163, 74, 0.55);
+  --cl-frame-glow: 0 0 16px rgba(22, 163, 74, 0.3);
+  --cl-frame-top-bar: #16a34a;
+  --cl-card-frame: #16a34a;
+  --cl-panel-border: #16a34a;
+
+  /* chrome */
+  --cl-chrome: #070b14;
+  --cl-chrome-text: #f8fafc;
+  --cl-chrome-muted: #94a3b8;
+  --cl-chrome-dim: #8494ab;
+  --cl-chrome-control: #1e293b;
+  --cl-chrome-border: #16a34a;
+
+  /* accent — lifted base, mirrored ramp, DARK ink (see the note above) */
+  --cl-accent: #10b981;
+  --cl-accent-hover: #34d399;
+  --cl-accent-active: #0ea371;
+  --cl-accent-ring: #6ee7b7;
+  --cl-accent-text: #022c22;        /* 5.97 / 7.88 / 4.69 across the three states */
+  --cl-accent-text-muted: #04463a;  /* 4.26 / 5.62 / 3.34 — dimmer, still legible */
+  --cl-accent-soft: rgba(16, 185, 129, 0.12);
+  --cl-accent-soft-border: rgba(16, 185, 129, 0.35);
+  --cl-accent-on-soft: #6ee7b7;
+
+  /* marks */
+  --cl-mark: #38bdf8;
+  --cl-mark-soft: rgba(56, 189, 248, 0.15);
+
+  /* status */
+  --cl-info-bg: #0c2d48;
+  --cl-info-border: #074b83;
+  --cl-info-text: #bae0fd;
+
+  --cl-success-bg: #073a2c;
+  --cl-success-border: #065f46;
+  --cl-success-text: #6ee7b7;
+  --cl-success: #34d399;
+  --cl-success-hover: #6ee7b7;
+  --cl-success-active: #10b981;
+  --cl-success-on: #022c22;
+
+  --cl-warn-bg: #402a06;
+  --cl-warn-border: #92400e;
+  --cl-warn-text: #fcd34d;
+  --cl-warn: #fbbf24;
+  --cl-warn-hover: #fcd34d;
+  --cl-warn-active: #f59e0b;
+  --cl-warn-on: #2b1600;
+
+  --cl-danger-bg: #450a0a;
+  --cl-danger-border: #991b1b;
+  --cl-danger-text: #fecaca;
+  --cl-danger: #f87171;
+  --cl-danger-hover: #fca5a5;
+  --cl-danger-active: #ef4444;
+  --cl-danger-on: #2d0505;
+}

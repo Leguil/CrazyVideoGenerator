@@ -1,0 +1,31 @@
+# Author: François Guillemette
+# CrazyLogix CrazyVideoGenerator Docker Compose Configuration
+services:
+  crazy-video-generator:
+    container_name: crazy-video-generator
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crazylogix/crazy-video-generator:latest
+    restart: unless-stopped
+    ports:
+      - "8202:8202"
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8202"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8202
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CRAZY_VIDEO_DEVICES=cuda:1,cuda:0
+    volumes:
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+      - ./brand:/app/brand:ro
+      - ./app:/app/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

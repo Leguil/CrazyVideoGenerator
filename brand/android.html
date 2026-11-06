@@ -1,0 +1,1142 @@
+<!-- Author: François Guillemette -->
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CrazyLogix — Android (Material 3 & Compose) Look & Feel Showcase</title>
+
+  <!-- Theme, applied before first paint so the page never flashes the wrong one.
+       Explicit opt-in only, persisted under the shared crazylogix_theme key. -->
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('crazylogix_theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = 'light';
+      document.documentElement.classList.toggle('dark', t === 'dark');
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+
+  <!-- Tailwind CSS via CDN with custom Android M3 & CrazyLogix tokens -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            crazylogix: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              300: '#86efac',
+              400: '#4ade80',
+              500: '#16a34a',
+              600: '#0e6b3f', // Primary CrazyLogix Green
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+              950: '#052e16',
+            },
+            m3: {
+              // Material 3 Dynamic Tonal Palette Tokens
+              primary: 'var(--m3-primary)',
+              onPrimary: 'var(--m3-on-primary)',
+              primaryContainer: 'var(--m3-primary-container)',
+              onPrimaryContainer: 'var(--m3-on-primary-container)',
+              secondary: 'var(--m3-secondary)',
+              onSecondary: 'var(--m3-on-secondary)',
+              secondaryContainer: 'var(--m3-secondary-container)',
+              onSecondaryContainer: 'var(--m3-on-secondary-container)',
+              tertiary: 'var(--m3-tertiary)',
+              onTertiary: 'var(--m3-on-tertiary)',
+              tertiaryContainer: 'var(--m3-tertiary-container)',
+              onTertiaryContainer: 'var(--m3-on-tertiary-container)',
+              error: 'var(--m3-error)',
+              onError: 'var(--m3-on-error)',
+              errorContainer: 'var(--m3-error-container)',
+              onErrorContainer: 'var(--m3-on-error-container)',
+              background: 'var(--m3-background)',
+              onBackground: 'var(--m3-on-background)',
+              surface: 'var(--m3-surface)',
+              onSurface: 'var(--m3-on-surface)',
+              surfaceVariant: 'var(--m3-surface-variant)',
+              onSurfaceVariant: 'var(--m3-on-surface-variant)',
+              outline: 'var(--m3-outline)',
+              outlineVariant: 'var(--m3-outline-variant)',
+              surfaceContainerLowest: 'var(--m3-surface-container-lowest)',
+              surfaceContainerLow: 'var(--m3-surface-container-low)',
+              surfaceContainer: 'var(--m3-surface-container)',
+              surfaceContainerHigh: 'var(--m3-surface-container-high)',
+              surfaceContainerHighest: 'var(--m3-surface-container-highest)',
+            }
+          },
+          fontFamily: {
+            sans: ['Roboto', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          },
+          borderRadius: {
+            'm3-xs': '4px',
+            'm3-sm': '8px',
+            'm3-md': '12px',
+            'm3-lg': '16px',
+            'm3-xl': '28px',
+            'm3-full': '9999px',
+          },
+          boxShadow: {
+            'm3-1': '0 1px 3px 1px rgba(0, 0, 0, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.30)',
+            'm3-2': '0 2px 6px 2px rgba(0, 0, 0, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.30)',
+            'm3-3': '0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px 0 rgba(0, 0, 0, 0.30)',
+            'm3-4': '0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 3px 0 rgba(0, 0, 0, 0.30)',
+            'm3-5': '0 8px 12px 6px rgba(0, 0, 0, 0.15), 0 4px 4px 0 rgba(0, 0, 0, 0.30)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
+    
+    /* Material 3 Dynamic Tonal Tokens (CSS Variables) */
+    :root {
+      /* CrazyLogix Emerald / Forest Theme (Light Mode) */
+      --m3-primary: #0e6b3f;
+      --m3-on-primary: #ffffff;
+      --m3-primary-container: #a3f2be;
+      --m3-on-primary-container: #00210e;
+      --m3-secondary: #4f6354;
+      --m3-on-secondary: #ffffff;
+      --m3-secondary-container: #d2e8d5;
+      --m3-on-secondary-container: #0c1f13;
+      --m3-tertiary: #3c6472;
+      --m3-on-tertiary: #ffffff;
+      --m3-tertiary-container: #c0e9fa;
+      --m3-on-tertiary-container: #001f28;
+      --m3-error: #ba1a1a;
+      --m3-on-error: #ffffff;
+      --m3-error-container: #ffdad6;
+      --m3-on-error-container: #410002;
+      --m3-background: #fbfdf8;
+      --m3-on-background: #191c19;
+      --m3-surface: #fbfdf8;
+      --m3-on-surface: #191c19;
+      --m3-surface-variant: #dce5dc;
+      --m3-on-surface-variant: #404942;
+      --m3-outline: #717972;
+      --m3-outline-variant: #c0c9c0;
+      --m3-surface-container-lowest: #ffffff;
+      --m3-surface-container-low: #f5f8f2;
+      --m3-surface-container: #eff2ec;
+      --m3-surface-container-high: #e9ece7;
+      --m3-surface-container-highest: #e4e7e1;
+    }
+
+    .dark {
+      /* CrazyLogix Emerald / Forest Theme (Dark Mode) */
+      --m3-primary: #87d5a3;
+      --m3-on-primary: #00391d;
+      --m3-primary-container: #00522c;
+      --m3-on-primary-container: #a3f2be;
+      --m3-secondary: #b6ccba;
+      --m3-on-secondary: #223527;
+      --m3-secondary-container: #384c3c;
+      --m3-on-secondary-container: #d2e8d5;
+      --m3-tertiary: #a4cddd;
+      --m3-on-tertiary: #043542;
+      --m3-tertiary-container: #224c5a;
+      --m3-on-tertiary-container: #c0e9fa;
+      --m3-error: #ffb4ab;
+      --m3-on-error: #690005;
+      --m3-error-container: #93000a;
+      --m3-on-error-container: #ffdad6;
+      --m3-background: #111412;
+      --m3-on-background: #e1e3de;
+      --m3-surface: #111412;
+      --m3-on-surface: #e1e3de;
+      --m3-surface-variant: #404942;
+      --m3-on-surface-variant: #c0c9c0;
+      --m3-outline: #8a938b;
+      --m3-outline-variant: #404942;
+      --m3-surface-container-lowest: #0c0f0d;
+      --m3-surface-container-low: #191c19;
+      --m3-surface-container: #1d201e;
+      --m3-surface-container-high: #272b28;
+      --m3-surface-container-highest: #323632;
+    }
+
+    /* Alternate Palette: Tech Cobalt */
+    [data-palette="cobalt"]:not(.dark) {
+      --m3-primary: #006399;
+      --m3-on-primary: #ffffff;
+      --m3-primary-container: #cee5ff;
+      --m3-on-primary-container: #001d32;
+      --m3-surface: #f8f9ff;
+      --m3-surface-container: #eceff8;
+      --m3-surface-container-high: #e6eaf3;
+      --m3-surface-variant: #dee3eb;
+      --m3-on-surface-variant: #42474e;
+    }
+    [data-palette="cobalt"].dark {
+      --m3-primary: #96ccff;
+      --m3-on-primary: #003353;
+      --m3-primary-container: #004a75;
+      --m3-on-primary-container: #cee5ff;
+      --m3-surface: #101418;
+      --m3-surface-container: #1d2024;
+      --m3-surface-container-high: #272b2e;
+      --m3-surface-variant: #42474e;
+      --m3-on-surface-variant: #c2c7cf;
+    }
+
+    /* Alternate Palette: Warm Amber Monet */
+    [data-palette="amber"]:not(.dark) {
+      --m3-primary: #7b5800;
+      --m3-on-primary: #ffffff;
+      --m3-primary-container: #ffdea2;
+      --m3-on-primary-container: #261900;
+      --m3-surface: #fff8f3;
+      --m3-surface-container: #f5ebe1;
+      --m3-surface-container-high: #efe5dc;
+      --m3-surface-variant: #eee1cf;
+      --m3-on-surface-variant: #4e4538;
+    }
+    [data-palette="amber"].dark {
+      --m3-primary: #f6be48;
+      --m3-on-primary: #412d00;
+      --m3-primary-container: #5d4200;
+      --m3-on-primary-container: #ffdea2;
+      --m3-surface: #17130b;
+      --m3-surface-container: #231f16;
+      --m3-surface-container-high: #2e2920;
+      --m3-surface-variant: #4e4538;
+      --m3-on-surface-variant: #d1c5b4;
+    }
+
+    /* Custom Android Phone Frame Styling */
+    .phone-mockup {
+      width: 390px;
+      height: 800px;
+      border-radius: 46px;
+      box-shadow: 0 0 0 10px #1e293b, 0 0 0 12px #334155, 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+    }
+    .dark .phone-mockup {
+      box-shadow: 0 0 0 10px #020617, 0 0 0 12px #1e293b, 0 25px 50px -12px rgba(0, 0, 0, 0.85);
+    }
+
+    /* Custom scrollbar */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* M3 Ripple Simulation */
+    .ripple {
+      position: relative;
+      overflow: hidden;
+    }
+    .ripple::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: currentColor;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      border-radius: inherit;
+    }
+    .ripple:active::after {
+      opacity: 0.16;
+    }
+
+    /* CrazyLogix Signature Green Frame on Cards & Panels */
+    .rounded-xl.border,
+    .rounded-2xl.border {
+      border-color: #0e6b3f !important;
+      border-width: 1.5px !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-full font-sans antialiased selection:bg-crazylogix-200 dark:selection:bg-crazylogix-900">
+
+  <!-- Top Navigation Bar with CrazyLogix Chrome & Green Frame -->
+  <header class="sticky top-0 z-40 w-full bg-[#0f172a] text-[#f1f5f9] transition-colors shadow-md" style="border-bottom: 1px solid #0e6b3f;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Lockup matching Screenshot_11.png -->
+      <div class="flex items-center gap-3">
+        <div class="w-[38px] h-[38px] flex items-center justify-center bg-white/[0.06] rounded-lg p-1 border border-white/10 flex-shrink-0">
+          <img src="crazylogix_logo.svg" alt="CrazyLogix" class="w-full h-full object-contain" />
+        </div>
+        <div class="flex flex-col justify-center">
+          <span class="font-bold text-[1.18rem] text-white tracking-tight leading-tight">Crazy&lt;ApplicationName&gt;</span>
+          <div class="flex items-center gap-1.5 mt-0.5 text-[0.72rem] font-semibold text-slate-400 tracking-wide">
+            <span>CrazyLogix</span>
+            <span class="text-[0.65rem] text-slate-500">&bull;</span>
+            <span>Insanely Simple</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions & Theme Switcher -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        
+        <!-- Link to Web Showcase -->
+        <a href="index.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-200 hover:bg-slate-800 border border-slate-700 transition">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <span class="hidden sm:inline">Web Showcase</span>
+        </a>
+
+        <!-- Palette Selector -->
+        <div class="relative hidden sm:block">
+          <select id="paletteSelect" class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+            <option value="default">Palette: CrazyLogix Green</option>
+            <option value="cobalt">Palette: Tech Cobalt</option>
+            <option value="amber">Palette: Warm Monet Amber</option>
+          </select>
+        </div>
+
+        <!-- View Mode Toggle (Mockup vs Grid) -->
+        <div class="inline-flex rounded-lg border border-slate-700 p-0.5 bg-slate-800 text-xs font-medium">
+          <button id="viewInteractiveBtn" class="px-2.5 py-1 rounded-md bg-slate-700 text-white shadow-sm transition">Simulator</button>
+          <button id="viewGridBtn" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white transition">Tokens & Specs</button>
+        </div>
+
+        <!-- Light/Dark Theme Toggle -->
+        <button id="themeToggle" title="Toggle Light/Dark Theme" class="p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9h-1m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Header Banner -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
+    <div class="rounded-2xl p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white shadow-lg border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="space-y-3 max-w-2xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+          <span>Android App Skeleton</span>
+          <span>•</span>
+          <span>Material 3 (M3) + Compose</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">CrazyLogix Android Design System</h1>
+        <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+          Interactive catalog and live smartphone simulator for Android applications (Idea Manager,
+          App Skeleton, and consumer apps). Features tonal surfaces, floating action buttons,
+          navigation bars, bottom sheets, and Jetpack Compose token contracts.
+        </p>
+      </div>
+      <div class="flex items-center gap-4 flex-shrink-0">
+        <div class="flex flex-col items-center p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+          <img src="crazylogix_logo.svg" alt="CrazyLogix Mark" class="w-12 h-12 object-contain mb-1" />
+          <span class="text-[10px] font-mono text-emerald-400">Adaptive Icon</span>
+        </div>
+        <div class="hidden sm:flex flex-col items-center p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+          <span class="text-2xl font-bold text-white">M3</span>
+          <span class="text-[10px] font-mono text-slate-400">Compose 1.7+</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main View Area -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- View Mode 1: Interactive Device Simulator & Component Inspector -->
+    <div id="interactiveSection" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      
+      <!-- Left Column: Android Smartphone Mockup (5 cols on lg) -->
+      <div class="lg:col-span-5 flex justify-center sticky top-24">
+        
+        <div class="phone-mockup bg-m3-surface text-m3-onSurface relative overflow-hidden flex flex-col border border-m3-outlineVariant/30 select-none">
+          
+          <!-- Top Status Bar & Camera Notch -->
+          <div class="h-11 px-6 pt-2 flex items-center justify-between text-xs font-semibold text-m3-onSurface z-30 bg-m3-surface/90 backdrop-blur-sm">
+            <span id="phoneClock" class="font-mono text-[13px]">09:41</span>
+            
+            <!-- Camera Punch Hole -->
+            <div class="w-4 h-4 rounded-full bg-black/90 border border-slate-700/50 shadow-inner flex items-center justify-center">
+              <div class="w-1.5 h-1.5 rounded-full bg-slate-900"></div>
+            </div>
+
+            <!-- Status Icons (5G, Wi-Fi, Battery) -->
+            <div class="flex items-center gap-1.5 text-m3-onSurface">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zm0 2c3.87 0 7 3.13 7 7 0 1.5-.47 2.89-1.28 4.04L12 19.62l-5.72-3.58C5.47 14.89 5 13.5 5 12c0-3.87 3.13-7 7-7z"/>
+              </svg>
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4z"/>
+              </svg>
+              <!-- Battery -->
+              <div class="w-5 h-2.5 rounded-sm border border-current p-0.5 flex items-center">
+                <div class="h-full w-3/4 bg-current rounded-xs"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Material 3 Top App Bar -->
+          <div id="phoneTopBar" class="px-4 py-2 bg-m3-surfaceContainer flex items-center justify-between border-b border-m3-outlineVariant/20 transition-colors z-20">
+            <div class="flex items-center gap-3">
+              <button id="menuActionBtn" class="p-2 rounded-full hover:bg-m3-onSurface/10 text-m3-onSurface ripple">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+              </button>
+              <div>
+                <h2 id="topBarTitle" class="text-base font-bold text-m3-onSurface leading-tight">Idea Manager</h2>
+                <p id="topBarSubtitle" class="text-[11px] text-m3-onSurfaceVariant">CrazyLogix Vault</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button id="searchActionBtn" class="p-2 rounded-full hover:bg-m3-onSurface/10 text-m3-onSurface ripple">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </button>
+              <button id="moreActionBtn" class="p-2 rounded-full hover:bg-m3-onSurface/10 text-m3-onSurface ripple">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Phone Screen Body -->
+          <div id="phoneScrollArea" class="flex-1 overflow-y-auto no-scrollbar p-3 space-y-3 bg-m3-surface">
+            
+            <!-- Filter Chips Row -->
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+              <button class="filter-chip active flex-shrink-0 px-3 py-1.5 rounded-m3-sm text-xs font-semibold bg-m3-secondaryContainer text-m3-onSecondaryContainer border border-m3-outline/20 shadow-xs flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>All (12)</span>
+              </button>
+              <button class="filter-chip flex-shrink-0 px-3 py-1.5 rounded-m3-sm text-xs font-medium bg-m3-surfaceContainerLow text-m3-onSurfaceVariant border border-m3-outlineVariant hover:bg-m3-surfaceContainer transition">
+                ⚡ Active (3)
+              </button>
+              <button class="filter-chip flex-shrink-0 px-3 py-1.5 rounded-m3-sm text-xs font-medium bg-m3-surfaceContainerLow text-m3-onSurfaceVariant border border-m3-outlineVariant hover:bg-m3-surfaceContainer transition">
+                🔥 Sparks (6)
+              </button>
+              <button class="filter-chip flex-shrink-0 px-3 py-1.5 rounded-m3-sm text-xs font-medium bg-m3-surfaceContainerLow text-m3-onSurfaceVariant border border-m3-outlineVariant hover:bg-m3-surfaceContainer transition">
+                🚀 Shipped (3)
+              </button>
+            </div>
+
+            <!-- Idea Card 1 (Active) -->
+            <div class="p-4 rounded-m3-lg bg-m3-surfaceContainerLow border border-m3-outlineVariant/60 shadow-m3-1 hover:shadow-m3-2 transition-all space-y-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200">ACTIVE</span>
+                    <span class="text-[11px] font-mono text-m3-onSurfaceVariant">ideas/markdown-studio.md</span>
+                  </div>
+                  <h3 class="font-bold text-sm text-m3-onSurface mt-1">Markdown Studio</h3>
+                </div>
+                <button class="text-m3-onSurfaceVariant hover:text-m3-primary p-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+                </button>
+              </div>
+              <p class="text-xs text-m3-onSurfaceVariant leading-relaxed">
+                Live markdown editor & previewer with Paged.js print engine, instant PDF export, and zero runtime dependencies.
+              </p>
+              <div class="flex items-center justify-between pt-1 border-t border-m3-outlineVariant/30 text-[11px]">
+                <div class="flex items-center gap-1.5 text-m3-primary font-medium">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                  <span>[[android-app-skeleton]]</span>
+                </div>
+                <span class="text-m3-onSurfaceVariant font-mono text-[10px]">Appetite: 2w</span>
+              </div>
+            </div>
+
+            <!-- Idea Card 2 (Spark) -->
+            <div class="p-4 rounded-m3-lg bg-m3-surfaceContainer border border-m3-outlineVariant/60 shadow-m3-1 hover:shadow-m3-2 transition-all space-y-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">SPARK</span>
+                    <span class="text-[11px] font-mono text-m3-onSurfaceVariant">ideas/idea-manager-android.md</span>
+                  </div>
+                  <h3 class="font-bold text-sm text-m3-onSurface mt-1">Idea Manager (Android)</h3>
+                </div>
+                <button class="text-m3-onSurfaceVariant hover:text-m3-primary p-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+                </button>
+              </div>
+              <p class="text-xs text-m3-onSurfaceVariant leading-relaxed">
+                Dedicated Android app in Kotlin + Compose to capture, structure, triage, and track ideas directly on markdown vaults.
+              </p>
+              <div class="flex items-center justify-between pt-1 border-t border-m3-outlineVariant/30 text-[11px]">
+                <div class="flex items-center gap-1.5 text-m3-primary font-medium">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                  <span>pkm, mobile, compose</span>
+                </div>
+                <span class="text-m3-onSurfaceVariant font-mono text-[10px]">Today</span>
+              </div>
+            </div>
+
+            <!-- Idea Card 3 (Shipped) -->
+            <div class="p-4 rounded-m3-lg bg-m3-surfaceContainerLowest border border-m3-outlineVariant/40 shadow-xs space-y-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200">SHIPPED</span>
+                    <span class="text-[11px] font-mono text-m3-onSurfaceVariant">ideas/image-to-svg.md</span>
+                  </div>
+                  <h3 class="font-bold text-sm text-m3-onSurface mt-1">Image to SVG Transformer</h3>
+                </div>
+                <button class="text-m3-onSurfaceVariant hover:text-m3-primary p-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+                </button>
+              </div>
+              <p class="text-xs text-m3-onSurfaceVariant leading-relaxed">
+                Pure Java & Canvas vectorization pipeline converting raster images to layered, clean SVGs.
+              </p>
+              <div class="flex items-center justify-between pt-1 border-t border-m3-outlineVariant/30 text-[11px]">
+                <span class="text-emerald-600 dark:text-emerald-400 font-semibold text-[10px]">✓ Fully functional</span>
+                <span class="text-m3-onSurfaceVariant font-mono text-[10px]">2026-08-27</span>
+              </div>
+            </div>
+
+            <!-- Spacing for FAB -->
+            <div class="h-16"></div>
+
+          </div>
+
+          <!-- Extended Floating Action Button (FAB) -->
+          <div class="absolute bottom-20 right-4 z-20">
+            <button id="openCaptureSheetBtn" class="flex items-center gap-2 px-4 py-3.5 rounded-m3-lg bg-m3-primaryContainer text-m3-onPrimaryContainer font-bold text-xs shadow-m3-3 hover:shadow-m3-4 active:scale-95 transition-all ripple">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+              <span>Capture Idea</span>
+            </button>
+          </div>
+
+          <!-- Modal Bottom Sheet (Hidden by default, overlays phone screen) -->
+          <div id="phoneBottomSheet" class="absolute inset-0 z-40 bg-black/60 backdrop-blur-xs flex flex-col justify-end hidden transition-all">
+            <div class="bg-m3-surfaceContainerLow text-m3-onSurface rounded-t-m3-xl p-5 border-t border-m3-outlineVariant shadow-m3-5 space-y-4 max-h-[85%] overflow-y-auto">
+              
+              <!-- Drag Handle -->
+              <div class="w-8 h-1 bg-m3-outline/40 rounded-full mx-auto mb-1 cursor-pointer" id="closeSheetHandle"></div>
+              
+              <div class="flex items-center justify-between">
+                <h4 class="font-bold text-base text-m3-onSurface">Quick Capture</h4>
+                <button id="closeSheetBtn" class="p-1 text-m3-onSurfaceVariant hover:text-m3-onSurface">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <!-- M3 Outlined Text Field -->
+              <div>
+                <label class="block text-[11px] font-semibold text-m3-primary mb-1">Title (Idea Name)</label>
+                <input id="newIdeaTitle" type="text" placeholder="e.g. Distributed Cache Inspector" class="w-full px-3.5 py-2.5 rounded-m3-sm bg-m3-surface border border-m3-primary text-sm text-m3-onSurface focus:outline-none focus:ring-2 focus:ring-m3-primary">
+              </div>
+
+              <!-- One sentence pitch -->
+              <div>
+                <label class="block text-[11px] font-semibold text-m3-onSurfaceVariant mb-1">The idea in one sentence</label>
+                <textarea id="newIdeaPitch" rows="2" placeholder="A lightweight Android monitor for..." class="w-full px-3.5 py-2 rounded-m3-sm bg-m3-surface border border-m3-outlineVariant text-xs text-m3-onSurface focus:outline-none focus:ring-2 focus:ring-m3-primary"></textarea>
+              </div>
+
+              <!-- Lifecycle Status Radio Chips -->
+              <div>
+                <span class="block text-[11px] font-semibold text-m3-onSurfaceVariant mb-1.5">Initial Status</span>
+                <div class="grid grid-cols-3 gap-2">
+                  <button type="button" class="px-2.5 py-1.5 rounded-m3-sm bg-m3-secondaryContainer text-m3-onSecondaryContainer text-xs font-bold text-center border border-m3-outline/20">Spark</button>
+                  <button type="button" class="px-2.5 py-1.5 rounded-m3-sm bg-m3-surface text-m3-onSurfaceVariant text-xs font-medium text-center border border-m3-outlineVariant">Exploring</button>
+                  <button type="button" class="px-2.5 py-1.5 rounded-m3-sm bg-m3-surface text-m3-onSurfaceVariant text-xs font-medium text-center border border-m3-outlineVariant">Active</button>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center justify-end gap-2 pt-2">
+                <button id="cancelCaptureBtn" class="px-4 py-2 rounded-m3-full text-xs font-bold text-m3-primary hover:bg-m3-primary/10 transition">Cancel</button>
+                <button id="saveCaptureBtn" class="px-5 py-2 rounded-m3-full bg-m3-primary text-m3-onPrimary text-xs font-bold shadow-m3-1 hover:shadow-m3-2 transition">Save Idea</button>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Material 3 Bottom Navigation Bar -->
+          <div class="h-16 bg-m3-surfaceContainer flex items-center justify-around border-t border-m3-outlineVariant/20 z-20">
+            <!-- Tab 1: Ideas (Active) -->
+            <button class="flex flex-col items-center gap-1 group flex-1 py-1">
+              <div class="px-4 py-1 rounded-full bg-m3-secondaryContainer text-m3-onSecondaryContainer group-hover:shadow-xs transition">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+              </div>
+              <span class="text-[10px] font-bold text-m3-onSurface">Ideas</span>
+            </button>
+
+            <!-- Tab 2: Triage -->
+            <button class="flex flex-col items-center gap-1 group flex-1 py-1 text-m3-onSurfaceVariant hover:text-m3-onSurface">
+              <div class="px-4 py-1 rounded-full group-hover:bg-m3-onSurface/10 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+              </div>
+              <span class="text-[10px] font-medium">Triage</span>
+            </button>
+
+            <!-- Tab 3: Vault / Files -->
+            <button class="flex flex-col items-center gap-1 group flex-1 py-1 text-m3-onSurfaceVariant hover:text-m3-onSurface">
+              <div class="px-4 py-1 rounded-full group-hover:bg-m3-onSurface/10 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                </svg>
+              </div>
+              <span class="text-[10px] font-medium">Vault</span>
+            </button>
+
+            <!-- Tab 4: Settings -->
+            <button class="flex flex-col items-center gap-1 group flex-1 py-1 text-m3-onSurfaceVariant hover:text-m3-onSurface">
+              <div class="px-4 py-1 rounded-full group-hover:bg-m3-onSurface/10 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+              </div>
+              <span class="text-[10px] font-medium">Settings</span>
+            </button>
+          </div>
+
+          <!-- Android Gesture Pill Bar -->
+          <div class="h-5 bg-m3-surfaceContainer flex items-center justify-center pb-1">
+            <div class="w-32 h-1 bg-m3-onSurface/30 rounded-full"></div>
+          </div>
+
+          <!-- Phone Notification Toast Simulator -->
+          <div id="phoneToast" class="absolute top-14 left-4 right-4 z-50 p-3 rounded-m3-md bg-m3-surfaceContainerHighest text-m3-onSurface shadow-m3-3 border border-m3-outlineVariant text-xs font-semibold flex items-center gap-2 transform -translate-y-16 opacity-0 transition-all duration-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
+            <span id="phoneToastMsg">Idea captured to inbox!</span>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Right Column: Interactive Android M3 Component Showcase & Control Center (7 cols on lg) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Simulator Control Panel Card -->
+        <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <h2 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">Simulator Controls</h2>
+            </div>
+            <span class="text-xs font-mono text-slate-500 dark:text-slate-400">Jetpack Compose Interactive</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            <button id="triggerSheetDemoBtn" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold text-slate-800 dark:text-slate-200 transition text-left flex items-center gap-2">
+              <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              <span>Toggle Bottom Sheet</span>
+            </button>
+
+            <button id="triggerToastDemoBtn" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold text-slate-800 dark:text-slate-200 transition text-left flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+              <span>Simulate Notification</span>
+            </button>
+
+            <button id="triggerAddCardBtn" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold text-slate-800 dark:text-slate-200 transition text-left flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>Add Mock Idea</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Material 3 Button Matrix -->
+        <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-m3-primary"></span>
+              Material 3 Button Hierarchy (`Button.kt`)
+            </h3>
+            <span class="text-[11px] font-mono text-slate-500">M3 Shape: 20dp / Pill</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Filled Button -->
+            <button class="px-5 py-2.5 rounded-m3-full bg-m3-primary text-m3-onPrimary text-xs font-bold shadow-m3-1 hover:shadow-m3-2 active:scale-95 transition">
+              Filled Button
+            </button>
+            <!-- Filled Tonal Button -->
+            <button class="px-5 py-2.5 rounded-m3-full bg-m3-secondaryContainer text-m3-onSecondaryContainer text-xs font-bold hover:shadow-xs active:scale-95 transition">
+              Filled Tonal
+            </button>
+            <!-- Elevated Button -->
+            <button class="px-5 py-2.5 rounded-m3-full bg-m3-surfaceContainerLow text-m3-primary text-xs font-bold shadow-m3-1 hover:shadow-m3-2 active:scale-95 transition border border-m3-outlineVariant/30">
+              Elevated
+            </button>
+            <!-- Outlined Button -->
+            <button class="px-5 py-2.5 rounded-m3-full border border-m3-outline text-m3-primary text-xs font-bold hover:bg-m3-primary/5 active:scale-95 transition">
+              Outlined
+            </button>
+            <!-- Text Button -->
+            <button class="px-4 py-2.5 rounded-m3-full text-m3-primary text-xs font-bold hover:bg-m3-primary/10 active:scale-95 transition">
+              Text Button
+            </button>
+          </div>
+
+          <!-- Icon & Floating Action Buttons -->
+          <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500 font-medium">FAB Scales:</span>
+              <!-- Small FAB -->
+              <button class="w-10 h-10 rounded-m3-md bg-m3-primaryContainer text-m3-onPrimaryContainer flex items-center justify-center shadow-m3-1 hover:shadow-m3-2 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+              </button>
+              <!-- Standard FAB -->
+              <button class="w-14 h-14 rounded-m3-lg bg-m3-primaryContainer text-m3-onPrimaryContainer flex items-center justify-center shadow-m3-3 hover:shadow-m3-4 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+              </button>
+              <!-- Large FAB -->
+              <button class="w-16 h-16 rounded-m3-xl bg-m3-primaryContainer text-m3-onPrimaryContainer flex items-center justify-center shadow-m3-3 hover:shadow-m3-4 transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Material 3 Chips & Selectors -->
+        <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-m3-secondary"></span>
+              Chips & Segmented Buttons (`Chip.kt`)
+            </h3>
+            <span class="text-[11px] font-mono text-slate-500">M3 Shape: 8dp</span>
+          </div>
+
+          <div class="space-y-3">
+            <!-- Filter Chips -->
+            <div>
+              <span class="text-xs font-semibold text-slate-500 block mb-1.5">Filter Chips (Selected vs Default):</span>
+              <div class="flex flex-wrap items-center gap-2">
+                <button class="px-3 py-1.5 rounded-m3-sm text-xs font-semibold bg-m3-secondaryContainer text-m3-onSecondaryContainer border border-m3-outline/20 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  <span>Markdown Vault</span>
+                </button>
+                <button class="px-3 py-1.5 rounded-m3-sm text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-50">
+                  <span>Git Repositories</span>
+                </button>
+                <button class="px-3 py-1.5 rounded-m3-sm text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-50">
+                  <span>SAF Directory</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Assist & Input Chips -->
+            <div>
+              <span class="text-xs font-semibold text-slate-500 block mb-1.5">Assist & Action Chips:</span>
+              <div class="flex flex-wrap items-center gap-2">
+                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-m3-sm border border-slate-300 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  <span>Set 2-Week Appetite</span>
+                </button>
+                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-m3-sm border border-slate-300 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/></svg>
+                  <span>Link [[slug]]</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Material 3 Form Controls & Switches -->
+        <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+              Form Controls & M3 Switches (`Switch.kt`)
+            </h3>
+            <span class="text-[11px] font-mono text-slate-500">M3 Thumb Icon Switch</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- M3 Outlined Text Field Demo -->
+            <div>
+              <label class="block text-xs font-semibold text-m3-primary mb-1">OutlinedTextField (Kotlin Compose)</label>
+              <div class="relative">
+                <input type="text" value="ideas/covoiturage-trip-counter.md" class="w-full px-3.5 py-2.5 rounded-m3-sm bg-slate-50 dark:bg-slate-800 border-2 border-m3-primary text-xs font-mono text-slate-900 dark:text-white focus:outline-none">
+                <span class="absolute right-3 top-2.5 text-xs text-m3-primary font-bold">✓</span>
+              </div>
+              <span class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">Lossless YAML Frontmatter bound</span>
+            </div>
+
+            <!-- M3 Switch & Checkbox Demo -->
+            <div class="space-y-3">
+              <!-- Switch with Icon -->
+              <label class="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 block">Foreground Service Sync</span>
+                  <span class="text-[10px] text-slate-500">Keep SAF vault indexed</span>
+                </div>
+                <div class="relative inline-block w-12 h-7">
+                  <input type="checkbox" checked class="sr-only peer">
+                  <div class="w-12 h-7 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:bg-m3-primary transition-colors"></div>
+                  <div class="absolute left-1 top-1 bg-white dark:bg-slate-900 w-5 h-5 rounded-full peer-checked:translate-x-5 peer-checked:bg-m3-onPrimary transition-transform flex items-center justify-center text-[10px] font-bold text-m3-primary">
+                    ✓
+                  </div>
+                </div>
+              </label>
+
+              <!-- Checkbox -->
+              <label class="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
+                <input type="checkbox" checked class="w-4 h-4 rounded text-m3-primary focus:ring-m3-primary bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                <span>Auto-generate `INDEX.md` backlinks</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- View Mode 2: Full Token Reference & Jetpack Compose Code Contracts -->
+    <div id="gridSection" class="space-y-8 mt-12">
+      
+      <!-- Section Header -->
+      <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          Jetpack Compose Design Tokens & Theme Architecture
+        </h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400">
+          Source of truth token contracts for <code class="font-mono">:core:designsystem</code> in Kotlin.
+        </p>
+      </div>
+
+      <!-- Grid of Token Tables & Code Snippets -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Column 1: Color Scheme Tokens -->
+        <div class="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Material 3 Color Roles (`Color.kt`)</h3>
+            <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold">CrazyLogix Theme</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 dark:bg-slate-800 text-[11px] uppercase text-slate-500 font-semibold">
+                <tr>
+                  <th class="px-3 py-2">Role</th>
+                  <th class="px-3 py-2">Light Token</th>
+                  <th class="px-3 py-2">Dark Token</th>
+                  <th class="px-3 py-2">Swatch</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
+                <tr>
+                  <td class="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-200">primary</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#0e6b3f</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#87d5a3</td>
+                  <td class="px-3 py-2.5"><span class="inline-block w-4 h-4 rounded-full bg-crazylogix-600 border border-slate-300"></span></td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-200">onPrimary</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#ffffff</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#00391d</td>
+                  <td class="px-3 py-2.5"><span class="inline-block w-4 h-4 rounded-full bg-white border border-slate-300"></span></td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-200">primaryContainer</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#a3f2be</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#00522c</td>
+                  <td class="px-3 py-2.5"><span class="inline-block w-4 h-4 rounded-full bg-emerald-200 border border-slate-300"></span></td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-200">surface</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#fbfdf8</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#111412</td>
+                  <td class="px-3 py-2.5"><span class="inline-block w-4 h-4 rounded-full bg-slate-900 border border-slate-600"></span></td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-200">surfaceContainer</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#eff2ec</td>
+                  <td class="px-3 py-2.5 text-slate-600 dark:text-slate-400">#1d201e</td>
+                  <td class="px-3 py-2.5"><span class="inline-block w-4 h-4 rounded-full bg-slate-800 border border-slate-600"></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Column 2: Kotlin Compose Code Sample -->
+        <div class="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 shadow-sm space-y-3 font-mono text-xs overflow-hidden">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span class="text-emerald-400 font-bold">Theme.kt (Jetpack Compose)</span>
+            <span class="text-slate-500 text-[10px]">CrazyLogix Design System</span>
+          </div>
+          <pre class="overflow-x-auto text-[11px] leading-relaxed text-slate-300"><code><span class="text-purple-400">package</span> com.crazylogix.core.designsystem.theme
+
+<span class="text-purple-400">private val</span> LightColorScheme = lightColorScheme(
+    primary = Color(<span class="text-amber-300">0xFF0E6B3F</span>),
+    onPrimary = Color.White,
+    primaryContainer = Color(<span class="text-amber-300">0xFFA3F2BE</span>),
+    onPrimaryContainer = Color(<span class="text-amber-300">0xFF00210E</span>),
+    surface = Color(<span class="text-amber-300">0xFFFBFDF8</span>),
+    surfaceContainer = Color(<span class="text-amber-300">0xFFEFF2EC</span>),
+    outline = Color(<span class="text-amber-300">0xFF717972</span>)
+)
+
+<span class="text-purple-400">private val</span> DarkColorScheme = darkColorScheme(
+    primary = Color(<span class="text-amber-300">0xFF87D5A3</span>),
+    onPrimary = Color(<span class="text-amber-300">0xFF00391D</span>),
+    primaryContainer = Color(<span class="text-amber-300">0xFF00522C</span>),
+    onPrimaryContainer = Color(<span class="text-amber-300">0xFFA3F2BE</span>),
+    surface = Color(<span class="text-amber-300">0xFF111412</span>),
+    surfaceContainer = Color(<span class="text-amber-300">0xFF1D201E</span>),
+    outline = Color(<span class="text-amber-300">0xFF8A938B</span>)
+)
+
+<span class="text-blue-400">@Composable</span>
+<span class="text-purple-400">fun</span> <span class="text-yellow-300">CrazyLogixTheme</span>(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: <span class="text-blue-400">@Composable</span> () -&gt; Unit
+) {
+    <span class="text-purple-400">val</span> colorScheme = <span class="text-purple-400">if</span> (darkTheme) DarkColorScheme <span class="text-purple-400">else</span> LightColorScheme
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = CrazyLogixTypography,
+        shapes = CrazyLogixShapes,
+        content = content
+    )
+}</code></pre>
+        </div>
+
+      </div>
+
+      <!-- Typography & Shape Scales -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Typography Scale -->
+        <div class="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Typography Scale (`Type.kt`)</h3>
+          <div class="space-y-3">
+            <div class="flex items-baseline justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+              <span class="text-2xl font-bold">Headline Large</span>
+              <span class="text-xs font-mono text-slate-400">32sp / Bold / -0.25sp</span>
+            </div>
+            <div class="flex items-baseline justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+              <span class="text-lg font-bold">Title Medium</span>
+              <span class="text-xs font-mono text-slate-400">16sp / SemiBold / +0.15sp</span>
+            </div>
+            <div class="flex items-baseline justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+              <span class="text-sm font-normal">Body Medium (Main Reading)</span>
+              <span class="text-xs font-mono text-slate-400">14sp / Regular / +0.25sp</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs font-mono font-medium">Label Small (Metadata / Tags)</span>
+              <span class="text-xs font-mono text-slate-400">11sp / Medium / +0.5sp</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shape Scale -->
+        <div class="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Shape Scale (`Shapes.kt`)</h3>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-m3-xs border border-slate-200 dark:border-slate-700 text-center">
+              <span class="font-bold block">Extra Small (4dp)</span>
+              <span class="text-[10px] text-slate-400">Input fields, tooltips</span>
+            </div>
+            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-m3-sm border border-slate-200 dark:border-slate-700 text-center">
+              <span class="font-bold block">Small (8dp)</span>
+              <span class="text-[10px] text-slate-400">Chips, snackbars</span>
+            </div>
+            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-m3-md border border-slate-200 dark:border-slate-700 text-center">
+              <span class="font-bold block">Medium (12dp)</span>
+              <span class="text-[10px] text-slate-400">Small cards, alert dialogs</span>
+            </div>
+            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-m3-lg border border-slate-200 dark:border-slate-700 text-center">
+              <span class="font-bold block">Large (16dp)</span>
+              <span class="text-[10px] text-slate-400">Standard Idea cards</span>
+            </div>
+            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-m3-xl border border-slate-200 dark:border-slate-700 text-center col-span-2">
+              <span class="font-bold block">Extra Large (28dp) & Full Pill</span>
+              <span class="text-[10px] text-slate-400">Modal Bottom Sheets, Floating Action Buttons</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Interactive JavaScript Controller -->
+  <script>
+    // Theme & Mode Switcher
+    const htmlEl = document.documentElement;
+    const themeToggleBtn = document.getElementById('themeToggle');
+    const paletteSelect = document.getElementById('paletteSelect');
+
+    // The initial theme is applied before paint by the script in <head>. Explicit
+    // opt-in only, persisted under the shared crazylogix_theme key — the design
+    // system is never wired to prefers-color-scheme (see tokens.css).
+    themeToggleBtn.addEventListener('click', () => {
+      const dark = !htmlEl.classList.contains('dark');
+      htmlEl.classList.toggle('dark', dark);
+      htmlEl.setAttribute('data-theme', dark ? 'dark' : 'light');
+      try { localStorage.setItem('crazylogix_theme', dark ? 'dark' : 'light'); } catch (e) {}
+      showPhoneToast('Theme set to ' + (dark ? 'Dark AMOLED' : 'Crisp Light'));
+    });
+
+    paletteSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'default') {
+        htmlEl.removeAttribute('data-palette');
+      } else {
+        htmlEl.setAttribute('data-palette', val);
+      }
+      showPhoneToast('Applied palette: ' + val);
+    });
+
+    // View Switcher (Simulator vs Specs)
+    const viewInteractiveBtn = document.getElementById('viewInteractiveBtn');
+    const viewGridBtn = document.getElementById('viewGridBtn');
+    const interactiveSection = document.getElementById('interactiveSection');
+    const gridSection = document.getElementById('gridSection');
+
+    viewInteractiveBtn.addEventListener('click', () => {
+      interactiveSection.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    viewGridBtn.addEventListener('click', () => {
+      gridSection.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Clock update
+    function updateClock() {
+      const clockEl = document.getElementById('phoneClock');
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      if (clockEl) clockEl.textContent = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Bottom Sheet Logic
+    const bottomSheet = document.getElementById('phoneBottomSheet');
+    const openSheetBtn = document.getElementById('openCaptureSheetBtn');
+    const closeSheetBtn = document.getElementById('closeSheetBtn');
+    const cancelCaptureBtn = document.getElementById('cancelCaptureBtn');
+    const saveCaptureBtn = document.getElementById('saveCaptureBtn');
+    const closeSheetHandle = document.getElementById('closeSheetHandle');
+    const triggerSheetDemoBtn = document.getElementById('triggerSheetDemoBtn');
+
+    function toggleSheet() {
+      bottomSheet.classList.toggle('hidden');
+    }
+
+    openSheetBtn?.addEventListener('click', toggleSheet);
+    closeSheetBtn?.addEventListener('click', toggleSheet);
+    cancelCaptureBtn?.addEventListener('click', toggleSheet);
+    closeSheetHandle?.addEventListener('click', toggleSheet);
+    triggerSheetDemoBtn?.addEventListener('click', toggleSheet);
+
+    saveCaptureBtn?.addEventListener('click', () => {
+      const titleInput = document.getElementById('newIdeaTitle');
+      const pitchInput = document.getElementById('newIdeaPitch');
+      const title = titleInput.value.trim() || 'New Spark Idea';
+      const pitch = pitchInput.value.trim() || 'Captured via Android quick capture modal.';
+
+      // Insert card into phone scroll area
+      const scrollArea = document.getElementById('phoneScrollArea');
+      const card = document.createElement('div');
+      card.className = 'p-4 rounded-m3-lg bg-m3-surfaceContainer border border-m3-outlineVariant/60 shadow-m3-1 space-y-2.5 animate-pulse';
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">SPARK</span>
+              <span class="text-[11px] font-mono text-m3-onSurfaceVariant">ideas/${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md</span>
+            </div>
+            <h3 class="font-bold text-sm text-m3-onSurface mt-1">${title}</h3>
+          </div>
+        </div>
+        <p class="text-xs text-m3-onSurfaceVariant leading-relaxed">${pitch}</p>
+        <div class="flex items-center justify-between pt-1 border-t border-m3-outlineVariant/30 text-[11px]">
+          <span class="text-m3-primary font-medium text-[10px]">Just now</span>
+          <span class="text-m3-onSurfaceVariant font-mono text-[10px]">Appetite: 1w</span>
+        </div>
+      `;
+
+      // Insert before the bottom spacing element
+      const lastChild = scrollArea.lastElementChild;
+      scrollArea.insertBefore(card, lastChild);
+      setTimeout(() => card.classList.remove('animate-pulse'), 800);
+
+      // Reset inputs & close
+      titleInput.value = '';
+      pitchInput.value = '';
+      toggleSheet();
+      showPhoneToast(`Saved "${title}" to vault!`);
+    });
+
+    // Toast Simulator
+    const phoneToast = document.getElementById('phoneToast');
+    const phoneToastMsg = document.getElementById('phoneToastMsg');
+    const triggerToastDemoBtn = document.getElementById('triggerToastDemoBtn');
+    let toastTimeout = null;
+
+    function showPhoneToast(msg) {
+      if (!phoneToast) return;
+      phoneToastMsg.textContent = msg;
+      phoneToast.classList.remove('-translate-y-16', 'opacity-0');
+      phoneToast.classList.add('translate-y-0', 'opacity-100');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        phoneToast.classList.remove('translate-y-0', 'opacity-100');
+        phoneToast.classList.add('-translate-y-16', 'opacity-0');
+      }, 2500);
+    }
+
+    triggerToastDemoBtn?.addEventListener('click', () => {
+      showPhoneToast('Background Sync: SAF directory up to date');
+    });
+
+    // Add mock card trigger
+    const triggerAddCardBtn = document.getElementById('triggerAddCardBtn');
+    triggerAddCardBtn?.addEventListener('click', () => {
+      const scrollArea = document.getElementById('phoneScrollArea');
+      const card = document.createElement('div');
+      card.className = 'p-4 rounded-m3-lg bg-m3-surfaceContainerLow border border-m3-outlineVariant/60 shadow-m3-1 space-y-2.5';
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 dark:bg-purple-900/60 dark:text-purple-200">EXPLORING</span>
+              <span class="text-[11px] font-mono text-m3-onSurfaceVariant">ideas/dlms-meter-tool.md</span>
+            </div>
+            <h3 class="font-bold text-sm text-m3-onSurface mt-1">DLMS Meter Tool</h3>
+          </div>
+        </div>
+        <p class="text-xs text-m3-onSurfaceVariant leading-relaxed">Android USB-OTG serial and Bluetooth diagnostic tool for electricity meters.</p>
+        <div class="flex items-center justify-between pt-1 border-t border-m3-outlineVariant/30 text-[11px]">
+          <span class="text-m3-primary font-medium text-[10px]">[[dlms-meter-tool]]</span>
+          <span class="text-m3-onSurfaceVariant font-mono text-[10px]">Appetite: 3w</span>
+        </div>
+      `;
+      scrollArea.insertBefore(card, scrollArea.lastElementChild);
+      showPhoneToast('Added "DLMS Meter Tool"');
+    });
+  </script>
+</body>
+</html>

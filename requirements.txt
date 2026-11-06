@@ -1,0 +1,22 @@
+# Author: François Guillemette
+# CrazyVideoGenerator Dependencies
+#
+# NOTE: PyTorch with CUDA acceleration must be installed matching your GPU driver:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# (Use cu128 for RTX 50-series Blackwell GPUs, or cu124/cu126 for older architectures)
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+pillow>=10.0.0
+safetensors>=0.4.0
+huggingface_hub>=0.23.0
+transformers>=4.48.0
+accelerate>=0.28.0
+diffusers>=0.33.0
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+ftfy>=6.1.0
+imageio>=2.34.0
+imageio-ffmpeg>=0.4.9
+numpy>=1.24.0

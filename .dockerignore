@@ -1,0 +1,17 @@
+# Author: François Guillemette
+# CrazyVideoGenerator .dockerignore
+
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+.venv
+venv
+models
+outputs
+.pytest_cache
+*.log
+.vscode
+.idea

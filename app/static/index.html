@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<!-- Author: François Guillemette -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrazyVideoGenerator — CrazyLogix Video Studio</title>
+    <!-- Prevent theme flash by reading localStorage immediately -->
+    <script>
+        (function() {
+            var theme = localStorage.getItem("crazylogix_theme") || "dark";
+            if (theme === "dark") {
+                document.documentElement.setAttribute("data-theme", "dark");
+                document.documentElement.classList.add("dark");
+            } else {
+                document.documentElement.removeAttribute("data-theme");
+                document.documentElement.classList.remove("dark");
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="/brand/tokens.css?v=1.0.4">
+    <link rel="stylesheet" href="/static/css/app.css?v=1.0.4">
+    <link rel="icon" type="image/svg+xml" href="/brand/crazylogix_logo.svg">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- ============================================================= -->
+        <!-- TIER 1: Main Header (Strict Brand Lockup & System Telemetry)   -->
+        <!-- ============================================================= -->
+        <header class="app-header">
+            <div class="header-left">
+                <a href="/" class="brand-lockup">
+                    <img src="/brand/crazylogix_logo.svg" alt="CrazyLogix" class="brand-logo" width="32" height="32">
+                    <div class="brand-text">
+                        <span class="brand-title">CrazyVideoGenerator</span>
+                        <span class="brand-subtitle">Wan2.1-T2V-1.3B Studio</span>
+                    </div>
+                </a>
+            </div>
+
+            <div class="header-center">
+                <div class="system-pills" id="systemPills">
+                    <!-- GPU 0 Telemetry Pill -->
+                    <div class="telemetry-pill" id="pillGpu0" title="GPU 0: Text Encoder, VAE, Web UI">
+                        <span class="pill-dot dot-active"></span>
+                        <span class="pill-label">GPU 0:</span>
+                        <span class="pill-val" id="gpu0Mem">-- / -- GB</span>
+                    </div>
+                    <!-- GPU 1 Telemetry Pill -->
+                    <div class="telemetry-pill" id="pillGpu1" title="GPU 1: Wan 3D Diffusion Transformer">
+                        <span class="pill-dot dot-active"></span>
+                        <span class="pill-label">GPU 1:</span>
+                        <span class="pill-val" id="gpu1Mem">-- / -- GB</span>
+                    </div>
+                    <!-- Model Status Pill -->
+                    <div class="telemetry-pill" id="pillModel" title="Wan2.1-T2V-1.3B Model State">
+                        <span class="pill-dot dot-warning" id="modelDot"></span>
+                        <span class="pill-label">Model:</span>
+                        <span class="pill-val" id="modelStatusText">Checking...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button type="button" class="btn btn-ghost" id="themeToggleBtn" title="Toggle Light/Dark Theme" aria-label="Toggle theme">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <button type="button" class="btn btn-ghost" id="diagModalBtn" title="System Diagnostics & Settings">
+                    ⚙ Diagnostics
+                </button>
+            </div>
+        </header>
+
+        <!-- ============================================================= -->
+        <!-- TIER 2: Secondary Action Sub-Toolbar (Direct Workflow Actions)-->
+        <!-- ============================================================= -->
+        <div class="action-bar">
+            <div class="action-bar-left">
+                <button type="button" class="btn btn-primary" id="btnGenerate">
+                    <span class="btn-icon">▶</span>
+                    <span>Generate Video</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnReset" title="Reset all fields to defaults">
+                    <span>↺ Reset</span>
+                </button>
+            </div>
+            <div class="action-bar-right">
+                <button type="button" class="btn btn-secondary hidden" id="btnDownloadModel" title="Download Wan2.1 Checkpoint">
+                    <span>⬇ Download Model</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnSmokeTest" title="Run Quick Smoke Test">
+                    <span>⚡ Smoke Test</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnToggleGallery" title="Toggle Video Output Gallery">
+                    <span>📁 Gallery (<span id="galleryCountBadge">0</span>)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- MAIN CONTENT WORKSPACE                                        -->
+        <!-- ============================================================= -->
+        <main class="main-workspace">
+            <!-- Left Parameter Sidebar -->
+            <aside class="sidebar-panel">
+                <form id="generateForm" onsubmit="return false;">
+                    <!-- Prompt Section -->
+                    <div class="form-group">
+                        <div class="label-row">
+                            <label for="promptInput">Prompt</label>
+                            <span class="helper-link" id="btnSamplePrompts">✨ Ideas</span>
+                        </div>
+                        <textarea
+                            id="promptInput"
+                            name="prompt"
+                            rows="4"
+                            class="input-textarea"
+                            placeholder="Describe your scene in cinematic detail... e.g. A majestic golden eagle soaring above snow-capped mountain peaks at golden hour, photorealistic, 4k, smooth cinematic motion."
+                            required
+                        ></textarea>
+                    </div>
+
+                    <!-- Negative Prompt Section -->
+                    <div class="form-group">
+                        <div class="label-row">
+                            <label for="negPromptInput">Negative Prompt</label>
+                            <span class="helper-text">Avoid in output</span>
+                        </div>
+                        <input
+                            type="text"
+                            id="negPromptInput"
+                            name="negative_prompt"
+                            class="input-text"
+                            placeholder="blurry, distorted, jerky motion, artifacts..."
+                        />
+                    </div>
+
+                    <!-- Presets Selector Cards -->
+                    <div class="form-group">
+                        <label>Aspect Ratio & Format</label>
+                        <div class="preset-grid" id="presetGrid">
+                            <!-- Populated dynamically by app.js -->
+                        </div>
+                    </div>
+
+                    <!-- Resolution & Frame Dimensions -->
+                    <div class="form-row">
+                        <div class="form-group col-half">
+                            <label for="inputWidth">Width</label>
+                            <input type="number" id="inputWidth" class="input-text" value="832" step="16" readonly>
+                        </div>
+                        <div class="form-group col-half">
+                            <label for="inputHeight">Height</label>
+                            <input type="number" id="inputHeight" class="input-text" value="480" step="16" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Frame Count and Duration -->
+                    <div class="form-group">
+                        <div class="label-row">
+                            <label for="selectFrames">Frame Sequence (4k + 1)</label>
+                            <span class="helper-badge" id="durationBadge">~5.0 sec @ 16 FPS</span>
+                        </div>
+                        <select id="selectFrames" class="input-select">
+                            <option value="81" selected>81 Frames (~5.0s @ 16 FPS) - Recommended</option>
+                            <option value="65">65 Frames (~4.0s @ 16 FPS)</option>
+                            <option value="49">49 Frames (~3.0s @ 16 FPS)</option>
+                            <option value="33">33 Frames (~2.0s @ 16 FPS) - Fast Preview</option>
+                            <option value="17">17 Frames (~1.0s @ 16 FPS) - Draft</option>
+                        </select>
+                    </div>
+
+                    <!-- Sliders: Steps and CFG -->
+                    <div class="form-row">
+                        <div class="form-group col-half">
+                            <div class="label-row">
+                                <label for="inputSteps">Steps</label>
+                                <span class="val-display" id="valSteps">35</span>
+                            </div>
+                            <input type="range" id="inputSteps" min="15" max="50" value="35" class="input-range">
+                        </div>
+                        <div class="form-group col-half">
+                            <div class="label-row">
+                                <label for="inputCfg">CFG Scale</label>
+                                <span class="val-display" id="valCfg">5.0</span>
+                            </div>
+                            <input type="range" id="inputCfg" min="1.0" max="10.0" step="0.5" value="5.0" class="input-range">
+                        </div>
+                    </div>
+
+                    <!-- Seed & FPS -->
+                    <div class="form-row">
+                        <div class="form-group col-half">
+                            <label for="inputSeed">Seed (-1 = Random)</label>
+                            <div class="input-with-icon">
+                                <input type="number" id="inputSeed" class="input-text" value="-1">
+                                <button type="button" class="input-icon-btn" id="btnRandomSeed" title="Generate a random seed">🎲</button>
+                            </div>
+                        </div>
+                        <div class="form-group col-half">
+                            <label for="inputFps">Framerate (FPS)</label>
+                            <input type="number" id="inputFps" class="input-text" value="16" min="8" max="30">
+                        </div>
+                    </div>
+
+                    <!-- Hardware Orchestration Card -->
+                    <div class="gpu-orchestration-card">
+                        <div class="card-header-sm">
+                            <span class="tech-icon">⚡</span>
+                            <span>Dual-GPU Hardware Pipeline</span>
+                        </div>
+                        <div class="card-body-sm">
+                            <div class="hardware-row">
+                                <span class="hw-comp">Wan 3D Transformer:</span>
+                                <span class="hw-dev badge-accent" id="hwTransformerDev">GPU 1 (cuda:1)</span>
+                            </div>
+                            <div class="hardware-row">
+                                <span class="hw-comp">UMT5 Text Encoder & VAE:</span>
+                                <span class="hw-dev badge-neutral" id="hwAuxDev">GPU 0 (cuda:0)</span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </aside>
+
+            <!-- Center / Right Hero Video Viewport -->
+            <section class="hero-viewport">
+                <!-- Idle State Placeholder -->
+                <div class="hero-placeholder" id="heroPlaceholder">
+                    <div class="placeholder-graphic">
+                        <div class="camera-icon">🎬</div>
+                    </div>
+                    <h3>CrazyLogix Wan2.1 Video Generator</h3>
+                    <p>Enter a prompt on the left and click <strong>Generate Video</strong> to synthesize high-definition motion video.</p>
+                    <div class="sample-prompt-chips">
+                        <button type="button" class="chip" data-sample="A futuristic neon cyber city in rain, reflections on wet asphalt, cinematic drone shot, smooth motion">
+                            🌆 Cyber City
+                        </button>
+                        <button type="button" class="chip" data-sample="A fluffy red fox walking through fresh snow in a pine forest, soft sunset lighting, ultra realistic">
+                            🦊 Winter Fox
+                        </button>
+                        <button type="button" class="chip" data-sample="Ink swirling and blooming in crystal clear water, volumetric colors, macro high speed photography">
+                            💧 Macro Ink
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Generation Overlay -->
+                <div class="generation-overlay hidden" id="generationOverlay">
+                    <div class="progress-box">
+                        <div class="spinner"></div>
+                        <h4 id="genStatusTitle">Synthesizing Video Latents...</h4>
+                        <div class="progress-bar-track">
+                            <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+                        </div>
+                        <div class="progress-metrics">
+                            <span id="metricStep">Step: 0 / 35 (0%)</span>
+                            <span id="metricSpeed">-- s/it</span>
+                            <span id="metricEta">ETA: --s</span>
+                        </div>
+                        <div class="gpu-live-strip" id="liveGpuStrip">
+                            <!-- GPU load bars populated via websocket -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Video Player Container -->
+                <div class="video-container hidden" id="videoContainer">
+                    <div class="video-wrapper">
+                        <video id="heroVideo" controls autoplay loop playsinline>
+                            Your browser does not support HTML5 video.
+                        </video>
+                    </div>
+                    <!-- Video Action Toolbar -->
+                    <div class="video-meta-bar">
+                        <div class="video-info">
+                            <span class="video-title" id="videoMetaPrompt">Prompt text...</span>
+                            <span class="video-subinfo" id="videoMetaDetails">832x480 • 81 Frames • 5.0s</span>
+                        </div>
+                        <div class="video-actions">
+                            <a id="btnDownloadVideo" class="btn btn-secondary btn-sm" download title="Download MP4 Video">
+                                ⬇ Download MP4
+                            </a>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnReuseParams" title="Restore parameters into sidebar">
+                                ↺ Reuse Settings
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnViewMetadata" title="View generation JSON">
+                                ℹ Metadata
+                            </button>
+                            <button type="button" class="btn btn-danger-outline btn-sm" id="btnDeleteVideo" title="Delete this video">
+                                🗑 Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ============================================================= -->
+        <!-- GALLERY SLIDE-OVER DRAWER                                     -->
+        <!-- ============================================================= -->
+        <aside class="gallery-drawer" id="galleryDrawer">
+            <div class="drawer-header">
+                <h3>Output Video Gallery</h3>
+                <button type="button" class="btn-close" id="btnCloseGallery" aria-label="Close Gallery">&times;</button>
+            </div>
+            <div class="drawer-body">
+                <div class="gallery-grid" id="galleryGrid">
+                    <!-- Populated dynamically with video cards -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- ============================================================= -->
+        <!-- SYSTEM DIAGNOSTICS & MODEL MANAGER MODAL                      -->
+        <!-- ============================================================= -->
+        <div class="modal-backdrop hidden" id="diagModal">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>CrazyLogix System Diagnostics & Model Manager</h3>
+                    <button type="button" class="btn-close" id="btnCloseDiag">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="diag-section">
+                        <h4>GPU Hardware Status</h4>
+                        <div id="diagGpuContainer" class="diag-gpu-grid">
+                            Loading GPU info...
+                        </div>
+                    </div>
+                    <div class="diag-section">
+                        <h4>Model Status: Wan2.1-T2V-1.3B</h4>
+                        <div id="diagModelInfo">
+                            Loading model status...
+                        </div>
+                        <div class="diag-actions">
+                            <button type="button" class="btn btn-primary" id="btnDiagDownload">
+                                ⬇ Download Wan2.1 Weights (~13.5 GB)
+                            </button>
+                        </div>
+                    </div>
+                    <div class="diag-section">
+                        <h4>Storage & Volumes</h4>
+                        <div id="diagDiskInfo">
+                            Loading disk info...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btnRefreshDiag">Refresh Telemetry</button>
+                    <button type="button" class="btn btn-primary" id="btnDoneDiag">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- METADATA INSPECTOR MODAL                                      -->
+        <!-- ============================================================= -->
+        <div class="modal-backdrop hidden" id="metaModal">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Generation Parameters & Metadata</h3>
+                    <button type="button" class="btn-close" id="btnCloseMeta">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <pre class="json-viewer" id="jsonViewerContent">{}</pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btnCopyJson">Copy JSON</button>
+                    <button type="button" class="btn btn-primary" id="btnDoneMeta">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- CRAZYLOGIX APPLICATION DIALOG (Replaces browser alert/confirm) -->
+        <!-- ============================================================= -->
+        <div class="modal-backdrop hidden" id="appDialogModal" role="dialog" aria-modal="true">
+            <div class="modal-card dialog-card" id="appDialogCard">
+                <div class="modal-header">
+                    <div class="dialog-header-left">
+                        <span class="dialog-icon" id="appDialogIcon">ℹ️</span>
+                        <h3 id="appDialogTitle">Notification</h3>
+                    </div>
+                    <button type="button" class="btn-close" id="btnAppDialogClose" aria-label="Close dialog">&times;</button>
+                </div>
+                <div class="modal-body dialog-body">
+                    <p class="dialog-message" id="appDialogMessage">Message text</p>
+                    <div class="dialog-details hidden" id="appDialogDetails"></div>
+                </div>
+                <div class="modal-footer dialog-footer">
+                    <button type="button" class="btn btn-secondary hidden" id="btnAppDialogCancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnAppDialogOk">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- TOAST NOTIFICATION CONTAINER                                 -->
+        <!-- ============================================================= -->
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="/static/js/app.js?v=1.0.4"></script>
+</body>
+</html>
