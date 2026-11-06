@@ -39,13 +39,13 @@ class GenerationJob:
         job_id: str,
         prompt: str,
         negative_prompt: Optional[str] = None,
-        width: int = 832,
-        height: int = 480,
-        num_frames: int = 81,
-        num_inference_steps: int = 35,
-        guidance_scale: float = 5.0,
+        width: int = 1280,
+        height: int = 704,
+        num_frames: int = DEFAULT_FRAMES,
+        num_inference_steps: int = DEFAULT_STEPS,
+        guidance_scale: float = DEFAULT_CFG,
         seed: int = -1,
-        fps: int = 16,
+        fps: int = DEFAULT_FPS,
         init_image: Optional[str] = None,
         image_strength: float = 0.85,
     ):
@@ -60,6 +60,7 @@ class GenerationJob:
         self.seed = seed
         self.fps = fps
         self.init_image = init_image
+        self.has_init_image: bool = bool(init_image)
         self.image_strength = image_strength
 
         self.status: str = "queued"  # queued, running, completed, failed
@@ -87,8 +88,8 @@ class GenerationJob:
             "guidance_scale": self.guidance_scale,
             "seed": self.seed,
             "fps": self.fps,
-            "has_init_image": bool(self.init_image),
-            "image_strength": self.image_strength if self.init_image else None,
+            "has_init_image": self.has_init_image,
+            "image_strength": self.image_strength if self.has_init_image else None,
             "progress_percent": self.progress_percent,
             "current_step": self.current_step,
             "total_steps": self.total_steps,
@@ -164,13 +165,13 @@ class EngineManager:
         self,
         prompt: str,
         negative_prompt: Optional[str] = None,
-        width: int = 832,
-        height: int = 480,
-        num_frames: int = 81,
-        num_inference_steps: int = 35,
-        guidance_scale: float = 5.0,
+        width: int = 1280,
+        height: int = 704,
+        num_frames: int = DEFAULT_FRAMES,
+        num_inference_steps: int = DEFAULT_STEPS,
+        guidance_scale: float = DEFAULT_CFG,
         seed: int = -1,
-        fps: int = 16,
+        fps: int = DEFAULT_FPS,
         init_image: Optional[str] = None,
         image_strength: float = 0.85,
     ) -> GenerationJob:
@@ -208,7 +209,7 @@ class EngineManager:
             self.jobs.pop(oldest_id, None)
 
     def start_download_thread(self) -> DownloadJob:
-        """Launch background thread to download Wan2.1 weights."""
+        """Launch background thread to download Wan2.2 weights."""
         if self.download_job.status == "downloading":
             return self.download_job
 
@@ -273,6 +274,30 @@ class EngineManager:
             self.download_job.error = str(exc)
             self.download_job.message = f"Download failed: {exc}"
 
+    def build_telemetry_payload(self, status: Dict[str, Any], msg_type: str = "telemetry") -> Dict[str, Any]:
+        """Build a standardized WebSocket telemetry or pong payload from get_system_status()."""
+        payload: Dict[str, Any] = {
+            "type": msg_type,
+            "gpus": status.get("gpus", []),
+            "model": {
+                "is_ready": status.get("model_ready", False),
+                "is_downloading": status.get("model_downloading", False),
+                "status_label": status.get("model_status_label", "missing"),
+                "model_size_gib": status.get("model_size_gib", 0.0),
+                "total_size_gib": status.get("model_total_gib", 0.0),
+                "download_percent": status.get("model_download_percent", 0),
+                "download_progress_label": status.get("model_download_label", ""),
+                "missing_components": status.get("missing_components", []),
+            },
+            "disk": status.get("disk", {}),
+            "recommended_device_mapping": status.get("recommended_device_mapping", {}),
+            "download": self.download_job.to_dict(),
+            "active_job": self.active_job.to_dict() if self.active_job else None,
+        }
+        if msg_type == "pong":
+            payload["timestamp"] = datetime.now().isoformat()
+        return payload
+
     async def _telemetry_loop(self) -> None:
         """Periodically broadcast GPU metrics and download status to all connected WebSockets."""
         logger.info("Telemetry broadcast loop started.")
@@ -286,24 +311,7 @@ class EngineManager:
                         self.download_job.progress_percent = status.get("model_download_percent", self.download_job.progress_percent)
                         self.download_job.message = f"Downloading: {status.get('model_download_label', '')}"
 
-                    await self.broadcast_message({
-                        "type": "telemetry",
-                        "gpus": status.get("gpus", []),
-                        "model": {
-                            "is_ready": status.get("model_ready", False),
-                            "is_downloading": status.get("model_downloading", False),
-                            "status_label": status.get("model_status_label", "missing"),
-                            "model_size_gib": status.get("model_size_gib", 0.0),
-                            "total_size_gib": status.get("model_total_gib", 0.0),
-                            "download_percent": status.get("model_download_percent", 0),
-                            "download_progress_label": status.get("model_download_label", ""),
-                            "missing_components": status.get("missing_components", []),
-                        },
-                        "disk": status.get("disk", {}),
-                        "recommended_device_mapping": status.get("recommended_device_mapping", {}),
-                        "download": self.download_job.to_dict(),
-                        "active_job": self.active_job.to_dict() if self.active_job else None,
-                    })
+                    await self.broadcast_message(self.build_telemetry_payload(status, "telemetry"))
                 except Exception as exc:
                     logger.debug(f"Telemetry broadcast error: {exc}")
 
@@ -369,6 +377,7 @@ class EngineManager:
                 await self.broadcast_message({"type": "job_failed", "job": job.to_dict()})
 
             finally:
+                job.init_image = None
                 self.active_job = None
                 self.job_queue.task_done()
 

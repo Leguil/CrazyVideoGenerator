@@ -1,10 +1,8 @@
 # Author: François Guillemette
-"""Dual-GPU Wan2.1-T2V-1.3B inference pipeline and video export utilities."""
+"""Dual-GPU Wan2.2-TI2V-5B inference pipeline and video export utilities."""
 
 from __future__ import annotations
 
-import base64
-import io
 import json
 import logging
 import os
@@ -27,6 +25,12 @@ from app.config import (
     OUTPUTS_DIR,
     PRESETS,
 )
+from app.media_utils import (
+    export_frames_to_mp4,
+    prepare_pil_image,
+    save_thumbnail,
+    to_uint8_array,
+)
 
 logger = logging.getLogger("crazy_video_generator.pipeline")
 
@@ -38,16 +42,9 @@ except ImportError:
 try:
     import numpy as np
     from PIL import Image as PILImage
-    from PIL import ImageOps as PILImageOps
 except ImportError:
     np = None
     PILImage = None
-    PILImageOps = None
-
-try:
-    import imageio
-except ImportError:
-    imageio = None
 
 
 class WanDualGpuPipeline:
@@ -146,7 +143,16 @@ class WanDualGpuPipeline:
         pipe.__class__ = _DualGpuWanPipeline
 
         if i2v_pipe is not None:
+            base_cb_inputs = list(
+                getattr(i2v_pipe, "_callback_tensor_inputs", ["latents", "prompt_embeds", "negative_prompt_embeds"])
+            )
+            for extra_k in ("first_frame_mask", "condition"):
+                if extra_k not in base_cb_inputs:
+                    base_cb_inputs.append(extra_k)
+
             class _DualGpuWanI2VPipeline(i2v_pipe.__class__):
+                _callback_tensor_inputs = base_cb_inputs
+
                 @property
                 def _execution_device(self) -> torch.device:
                     return primary_dev
@@ -162,20 +168,41 @@ class WanDualGpuPipeline:
             if module is None:
                 continue
 
-            def _make_pre_hook(dev: str):
+            def _make_pre_hook(dev: str, name: str = comp_name):
                 def _pre_hook(mod: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]):
+                    actual_dev = dev
                     try:
                         p = next(mod.parameters(), None)
-                        if p is not None and str(p.device) != dev:
-                            mod.to(dev)
+                        if p is not None:
+                            cur_dev = str(p.device)
+                            if cur_dev != dev:
+                                can_move = True
+                                if dev.startswith("cuda") and torch is not None and torch.cuda.is_available():
+                                    free_bytes, _ = torch.cuda.mem_get_info(torch.device(dev))
+                                    min_bytes = int(11.2 * (1024 ** 3)) if name == "text_encoder" else int(1.0 * (1024 ** 3))
+                                    if free_bytes < min_bytes:
+                                        can_move = False
+                                        actual_dev = cur_dev
+                                if can_move:
+                                    mod.to(dev)
+                                    if name == "text_encoder":
+                                        self.text_encoder_device = dev
+                            p_after = next(mod.parameters(), None)
+                            if p_after is not None:
+                                actual_dev = str(p_after.device)
                     except Exception:
-                        pass
-                    new_args = self._move_tensors_to_device(args, dev)
-                    new_kwargs = self._move_tensors_to_device(kwargs, dev)
+                        try:
+                            p_fallback = next(mod.parameters(), None)
+                            if p_fallback is not None:
+                                actual_dev = str(p_fallback.device)
+                        except Exception:
+                            pass
+                    new_args = self._move_tensors_to_device(args, actual_dev)
+                    new_kwargs = self._move_tensors_to_device(kwargs, actual_dev)
                     return new_args, new_kwargs
                 return _pre_hook
 
-            module.register_forward_pre_hook(_make_pre_hook(target_dev), with_kwargs=True)
+            module.register_forward_pre_hook(_make_pre_hook(target_dev, comp_name), with_kwargs=True)
 
         # Enable VAE tiling/slicing if supported to prevent VRAM spikes during 3D decoding
         if getattr(pipe, "vae", None) is not None:
@@ -197,6 +224,7 @@ class WanDualGpuPipeline:
                                 if free_bytes < int(3.8 * (1024 ** 3)):
                                     logger.info("Temporarily offloading text_encoder to CPU to free VRAM for 720p VAE decode...")
                                     pipe.text_encoder.to("cpu")
+                                    self.text_encoder_device = "cpu"
                                     torch.cuda.empty_cache()
                             except Exception:
                                 pass
@@ -308,35 +336,10 @@ class WanDualGpuPipeline:
         elapsed = round(time.time() - t0, 2)
         logger.info(f"Wan2.2 TI2V-5B pipeline loaded successfully in {elapsed}s.")
 
-    @staticmethod
-    def _prepare_pil_image(init_image: Any, width: int, height: int) -> Any:
-        """Decode and center-crop/resize an input image to exact (width, height)."""
-        if PILImage is None:
-            raise RuntimeError("Pillow is required for starting image conditioning.")
-
-        if isinstance(init_image, PILImage.Image):
-            img = init_image
-        elif isinstance(init_image, Path) or (
-            isinstance(init_image, str)
-            and not init_image.startswith("data:")
-            and len(init_image) < 260
-            and Path(init_image).exists()
-        ):
-            img = PILImage.open(init_image)
-        elif isinstance(init_image, str):
-            b64_data = init_image.split(",", 1)[1] if "," in init_image else init_image
-            raw_bytes = base64.b64decode(b64_data)
-            img = PILImage.open(io.BytesIO(raw_bytes))
-        else:
-            raise ValueError("Unsupported init_image format.")
-
-        img = img.convert("RGB")
-        resample = getattr(PILImage, "Resampling", PILImage).LANCZOS
-        if PILImageOps is not None:
-            img = PILImageOps.fit(img, (width, height), method=resample)
-        else:
-            img = img.resize((width, height), resample)
-        return img
+    _prepare_pil_image = staticmethod(prepare_pil_image)
+    _to_uint8_array = staticmethod(to_uint8_array)
+    _export_frames_to_mp4 = staticmethod(export_frames_to_mp4)
+    _save_thumbnail = staticmethod(save_thumbnail)
 
     def _encode_init_image(
         self,
@@ -349,23 +352,7 @@ class WanDualGpuPipeline:
         if PILImage is None or torch is None:
             raise RuntimeError("PIL and PyTorch are required for starting image conditioning.")
 
-        if isinstance(init_image, PILImage.Image):
-            img = init_image
-        elif isinstance(init_image, Path) or (isinstance(init_image, str) and not init_image.startswith("data:") and len(init_image) < 260 and Path(init_image).exists()):
-            img = PILImage.open(init_image)
-        elif isinstance(init_image, str):
-            b64_data = init_image.split(",", 1)[1] if "," in init_image else init_image
-            raw_bytes = base64.b64decode(b64_data)
-            img = PILImage.open(io.BytesIO(raw_bytes))
-        else:
-            raise ValueError("Unsupported init_image format.")
-
-        img = img.convert("RGB")
-        resample = getattr(PILImage, "Resampling", PILImage).LANCZOS
-        if PILImageOps is not None:
-            img = PILImageOps.fit(img, (width, height), method=resample)
-        else:
-            img = img.resize((width, height), resample)
+        img = self._prepare_pil_image(init_image, width, height)
 
         # Convert RGB [0, 255] -> float32 [-1.0, 1.0] with shape [1, 3, 1, H, W]
         arr = np.asarray(img, dtype=np.float32) / 127.5 - 1.0
@@ -399,13 +386,13 @@ class WanDualGpuPipeline:
         self,
         prompt: str,
         negative_prompt: Optional[str] = None,
-        width: int = 832,
-        height: int = 480,
-        num_frames: int = 81,
-        num_inference_steps: int = 35,
-        guidance_scale: float = 5.0,
+        width: int = 1280,
+        height: int = 704,
+        num_frames: int = DEFAULT_FRAMES,
+        num_inference_steps: int = DEFAULT_STEPS,
+        guidance_scale: float = DEFAULT_CFG,
         seed: int = -1,
-        fps: int = 16,
+        fps: int = DEFAULT_FPS,
         init_image: Optional[Any] = None,
         image_strength: float = 0.85,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
@@ -440,11 +427,16 @@ class WanDualGpuPipeline:
             and self.i2v_pipeline is not None
             and getattr(self.pipeline.config, "expand_timesteps", False)
         )
+        i2v_cutoff_step = max(1, int(round(clamped_strength * num_inference_steps)))
         logger.info(
             f"Starting generation: {width}x{height}, {num_frames} frames, "
             f"{num_inference_steps} steps, cfg={guidance_scale}, seed={seed}, "
             f"init_image={has_init_image}"
-            + (f" (native_i2v={use_native_i2v}, strength={clamped_strength})" if has_init_image else "")
+            + (
+                f" (native_i2v={use_native_i2v}, strength={clamped_strength}, cutoff_step={i2v_cutoff_step}/{num_inference_steps})"
+                if has_init_image
+                else ""
+            )
         )
 
         pil_init_image = None
@@ -456,8 +448,8 @@ class WanDualGpuPipeline:
             else:
                 first_frame_latent = self._encode_init_image(init_image, width, height, exec_dev)
                 vae_scale_temp = getattr(self.pipeline, "vae_scale_factor_temporal", 4)
-                vae_scale_spat = getattr(self.pipeline, "vae_scale_factor_spatial", 8)
-                in_channels = getattr(self.pipeline.transformer.config, "in_channels", 16)
+                vae_scale_spat = getattr(self.pipeline, "vae_scale_factor_spatial", 16)
+                in_channels = getattr(self.pipeline.transformer.config, "in_channels", 48)
                 num_latent_frames = (num_frames - 1) // vae_scale_temp + 1
                 latent_shape = (
                     1,
@@ -474,6 +466,28 @@ class WanDualGpuPipeline:
                 )
 
         def step_callback(pipe_self: Any, step_idx: int, timestep: Any, cb_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+            if (
+                use_native_i2v
+                and clamped_strength < 1.0
+                and step_idx == (i2v_cutoff_step - 1)
+                and i2v_cutoff_step < num_inference_steps
+                and "first_frame_mask" in cb_kwargs
+                and "condition" in cb_kwargs
+                and "latents" in cb_kwargs
+            ):
+                latents = cb_kwargs["latents"]
+                condition = cb_kwargs["condition"]
+                first_frame_mask = cb_kwargs["first_frame_mask"]
+                sigmas = getattr(pipe_self.scheduler, "sigmas", None)
+                sigma_next = float(sigmas[step_idx + 1]) if (sigmas is not None and (step_idx + 1) < len(sigmas)) else 0.0
+                # Transition frame 0 onto the active flow-matching noise trajectory for the remaining (1 - strength) steps
+                latents[:, :, :1, :, :] = (
+                    (1.0 - sigma_next) * condition[:, :, :1, :, :].to(latents.dtype)
+                    + sigma_next * latents[:, :, :1, :, :]
+                )
+                first_frame_mask[:, :, :1, :, :] = 1.0
+                cb_kwargs["latents"] = latents
+
             if first_frame_latent is not None and init_noise is not None and "latents" in cb_kwargs:
                 latents = cb_kwargs["latents"]
                 sigmas = getattr(pipe_self.scheduler, "sigmas", None)
@@ -530,11 +544,18 @@ class WanDualGpuPipeline:
             }
             if init_noise is not None:
                 pipe_kwargs["latents"] = init_noise.clone()
-            if progress_callback is not None or first_frame_latent is not None:
+            need_step_cb = (
+                progress_callback is not None
+                or first_frame_latent is not None
+                or (use_native_i2v and clamped_strength < 1.0)
+            )
+            if need_step_cb:
                 pipe_kwargs["callback_on_step_end"] = step_callback
 
             if use_native_i2v and pil_init_image is not None:
                 pipe_kwargs["image"] = pil_init_image
+                if clamped_strength < 1.0:
+                    pipe_kwargs["callback_on_step_end_tensor_inputs"] = ["latents", "first_frame_mask", "condition"]
                 output = self.i2v_pipeline(**pipe_kwargs)
             else:
                 output = self.pipeline(**pipe_kwargs)
@@ -596,48 +617,6 @@ class WanDualGpuPipeline:
             "file_size_mb": file_size_mb,
             "metadata": metadata,
         }
-
-    @staticmethod
-    def _to_uint8_array(frame: Any) -> Any:
-        """Convert PIL Image, float32 [0, 1] array, or Tensor to uint8 [0, 255] NumPy array."""
-        if PILImage is not None and isinstance(frame, PILImage.Image):
-            return np.array(frame, dtype=np.uint8)
-        if torch is not None and isinstance(frame, torch.Tensor):
-            frame = frame.detach().cpu().numpy()
-        if isinstance(frame, np.ndarray):
-            if np.issubdtype(frame.dtype, np.floating):
-                if frame.max() <= 1.0 + 1e-3:
-                    frame = np.clip(frame * 255.0, 0, 255).round().astype(np.uint8)
-                else:
-                    frame = np.clip(frame, 0, 255).round().astype(np.uint8)
-            elif frame.dtype != np.uint8:
-                frame = np.clip(frame, 0, 255).astype(np.uint8)
-            return frame
-        return np.asarray(frame, dtype=np.uint8)
-
-    @staticmethod
-    def _export_frames_to_mp4(frames: Any, output_path: Path, fps: int = 16) -> None:
-        """Export list of PIL Images or NumPy arrays to an optimized web MP4."""
-        frame_arrays = [WanDualGpuPipeline._to_uint8_array(f) for f in frames]
-
-        # Write video with H.264 web-compatible profile
-        imageio.mimwrite(
-            str(output_path),
-            frame_arrays,
-            fps=fps,
-            codec="libx264",
-            output_params=["-pix_fmt", "yuv420p", "-crf", "19", "-preset", "medium"],
-        )
-
-    @staticmethod
-    def _save_thumbnail(frame: Any, thumb_path: Path) -> None:
-        """Save representative image frame as JPEG thumbnail."""
-        if PILImage is not None and isinstance(frame, PILImage.Image):
-            frame.save(thumb_path, format="JPEG", quality=85)
-        else:
-            arr = WanDualGpuPipeline._to_uint8_array(frame)
-            img = PILImage.fromarray(arr)
-            img.save(thumb_path, format="JPEG", quality=85)
 
 
 # Global singleton instance

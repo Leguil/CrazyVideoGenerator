@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.config import (
     EXPECTED_MODEL_GIB,
@@ -149,12 +149,43 @@ def cleanup_orphaned_download_files(
     return freed_bytes
 
 
+def _verify_sharded_component(
+    comp_dir: Path,
+    comp_name: str,
+    index_filename: str,
+    min_fallback_gib: float,
+) -> Tuple[bool, Optional[str]]:
+    """Verify that all safetensors shards referenced in an index file exist on disk."""
+    if not comp_dir.exists():
+        return False, comp_name
+
+    idx_path = comp_dir / index_filename
+    if idx_path.exists():
+        try:
+            with open(idx_path, "r", encoding="utf-8") as fp:
+                idx_data = json.load(fp)
+            needed = set(idx_data.get("weight_map", {}).values())
+            existing = set(os.listdir(comp_dir))
+            missing = needed - existing
+            if len(missing) == 0 and len(needed) > 0:
+                return True, None
+            if missing:
+                return False, f"{comp_name} ({len(missing)} shards missing)"
+        except Exception:
+            return False, comp_name
+
+    st_files = list(comp_dir.glob("*.safetensors"))
+    if st_files and sum(f.stat().st_size for f in st_files) > min_fallback_gib * (1024 ** 3):
+        return True, None
+    return False, comp_name
+
+
 def check_model_files(
     model_path: Optional[Path] = None,
     max_age_sec: float = 2.0,
     is_active_download: Optional[bool] = None,
 ) -> Dict[str, Any]:
-    """Check local presence and integrity of Wan2.1 model files, differentiating downloading vs ready."""
+    """Check local presence and integrity of Wan2.2 model files, differentiating downloading vs ready."""
     global _last_model_time, _cached_model_stat
     now = time.time()
     if not model_path and is_active_download is None and _cached_model_stat and (now - _last_model_time) < max_age_sec:
@@ -228,54 +259,26 @@ def check_model_files(
     if not has_index:
         status["missing_components"].append("model_index.json")
 
-    # Check transformer shards
-    tr_path = path / "transformer"
-    tr_ready = False
-    if tr_path.exists():
-        tr_index = tr_path / "diffusion_pytorch_model.safetensors.index.json"
-        if tr_index.exists():
-            try:
-                with open(tr_index, "r", encoding="utf-8") as fp:
-                    idx_data = json.load(fp)
-                needed = set(idx_data.get("weight_map", {}).values())
-                existing = set(os.listdir(tr_path))
-                missing = needed - existing
-                tr_ready = (len(missing) == 0 and len(needed) > 0)
-                if missing:
-                    status["missing_components"].append(f"transformer ({len(missing)} shards missing)")
-            except Exception:
-                tr_ready = False
-        else:
-            # Check single safetensors or bin
-            st_files = list(tr_path.glob("*.safetensors"))
-            tr_ready = bool(st_files and sum(f.stat().st_size for f in st_files) > 2.0 * (1024**3))
+    # Check transformer and text_encoder shards
+    tr_ready, tr_missing = _verify_sharded_component(
+        path / "transformer",
+        "transformer",
+        "diffusion_pytorch_model.safetensors.index.json",
+        min_fallback_gib=2.0,
+    )
     status["components_found"]["transformer"] = tr_ready
-    if not tr_ready and "transformer" not in [m.split()[0] for m in status["missing_components"]]:
-        status["missing_components"].append("transformer")
+    if tr_missing:
+        status["missing_components"].append(tr_missing)
 
-    # Check text_encoder shards
-    te_path = path / "text_encoder"
-    te_ready = False
-    if te_path.exists():
-        te_index = te_path / "model.safetensors.index.json"
-        if te_index.exists():
-            try:
-                with open(te_index, "r", encoding="utf-8") as fp:
-                    idx_data = json.load(fp)
-                needed = set(idx_data.get("weight_map", {}).values())
-                existing = set(os.listdir(te_path))
-                missing = needed - existing
-                te_ready = (len(missing) == 0 and len(needed) > 0)
-                if missing:
-                    status["missing_components"].append(f"text_encoder ({len(missing)} shards missing)")
-            except Exception:
-                te_ready = False
-        else:
-            st_files = list(te_path.glob("*.safetensors"))
-            te_ready = bool(st_files and sum(f.stat().st_size for f in st_files) > 8.0 * (1024**3))
+    te_ready, te_missing = _verify_sharded_component(
+        path / "text_encoder",
+        "text_encoder",
+        "model.safetensors.index.json",
+        min_fallback_gib=8.0,
+    )
     status["components_found"]["text_encoder"] = te_ready
-    if not te_ready and "text_encoder" not in [m.split()[0] for m in status["missing_components"]]:
-        status["missing_components"].append("text_encoder")
+    if te_missing:
+        status["missing_components"].append(te_missing)
 
     # Check VAE
     vae_path = path / "vae"
@@ -340,7 +343,7 @@ def check_model_files(
 
 def convert_model_shards_to_bf16(
     model_path: Optional[Path] = None,
-    progress_cb: Optional[Any] = None,
+    progress_cb: Optional[Callable[[str], None]] = None,
 ) -> None:
     """Convert any float32 safetensors shards in text_encoder/ and transformer/ to bfloat16 in-place."""
     import gc
@@ -357,6 +360,7 @@ def convert_model_shards_to_bf16(
         shards = sorted(sub_dir.glob("*.safetensors"))
         total_sub_bytes = 0
         for shard in shards:
+            old_mb = round(shard.stat().st_size / (1024 * 1024), 1)
             tensors = {}
             metadata = {}
             needs_conversion = False
@@ -372,19 +376,25 @@ def convert_model_shards_to_bf16(
                     tensors[k] = t
 
             if not needs_conversion:
+                if progress_cb:
+                    progress_cb(f"{sub}/{shard.name}: Already bfloat16 ({old_mb} MB)")
                 total_sub_bytes += shard.stat().st_size
                 del tensors
                 gc.collect()
                 continue
 
             if progress_cb:
-                progress_cb(f"Optimizing {sub}/{shard.name} to bfloat16...")
+                progress_cb(f"Converting {sub}/{shard.name} ({old_mb} MB) -> bfloat16...")
             tmp_path = shard.with_suffix(".bf16.tmp")
             save_file(tensors, str(tmp_path), metadata=metadata or {"format": "pt"})
             del tensors
             gc.collect()
             tmp_path.replace(shard)
-            total_sub_bytes += shard.stat().st_size
+            new_size = shard.stat().st_size
+            total_sub_bytes += new_size
+            if progress_cb:
+                new_mb = round(new_size / (1024 * 1024), 1)
+                progress_cb(f"Converted {sub}/{shard.name}: {old_mb} MB -> {new_mb} MB")
 
         for idx_file in sub_dir.glob("*.index.json"):
             try:
@@ -397,9 +407,23 @@ def convert_model_shards_to_bf16(
             except Exception:
                 pass
 
+        cfg_file = sub_dir / "config.json"
+        if cfg_file.exists():
+            try:
+                with open(cfg_file, "r", encoding="utf-8") as fp:
+                    cfg_data = json.load(fp)
+                if cfg_data.get("torch_dtype") == "float32":
+                    cfg_data["torch_dtype"] = "bfloat16"
+                    with open(cfg_file, "w", encoding="utf-8") as fp:
+                        json.dump(cfg_data, fp, indent=2)
+            except Exception:
+                pass
+
     cache_dir = path / ".cache"
     if cache_dir.exists():
         shutil.rmtree(cache_dir, ignore_errors=True)
+        if progress_cb:
+            progress_cb("Cleaned .cache directory.")
 
 
 def get_disk_usage() -> Dict[str, Any]:
@@ -442,11 +466,25 @@ def get_system_status() -> Dict[str, Any]:
     disk = get_disk_usage()
 
     has_dual_gpu = len(gpus) >= 2
+    aux_te_dev = "cuda:0" if gpus else "cpu"
+    if gpus and gpus[0].get("memory_free_gib", 16.0) < 11.2:
+        aux_te_dev = "cpu"
+
     recommended_split = {
         "transformer_device": "cuda:1" if has_dual_gpu else ("cuda:0" if gpus else "cpu"),
-        "text_encoder_device": "cuda:0" if gpus else "cpu",
+        "text_encoder_device": aux_te_dev,
         "vae_device": "cuda:0" if gpus else "cpu",
     }
+    try:
+        from app.pipeline import global_pipeline
+        if global_pipeline is not None and global_pipeline.pipeline is not None:
+            recommended_split = {
+                "transformer_device": global_pipeline.transformer_device,
+                "text_encoder_device": global_pipeline.text_encoder_device,
+                "vae_device": global_pipeline.vae_device,
+            }
+    except Exception:
+        pass
 
     return {
         "status": "online",

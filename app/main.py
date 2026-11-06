@@ -113,6 +113,16 @@ class GenerateRequest(BaseModel):
             raise ValueError(f"num_frames must satisfy 4k + 1 (e.g. {VALID_FRAME_COUNTS}).")
         return v
 
+    @field_validator("init_image")
+    @classmethod
+    def validate_init_image_payload(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        max_b64_chars = 20 * 1024 * 1024  # ~15 MB decoded image limit
+        if len(v) > max_b64_chars:
+            raise ValueError("Starting image exceeds maximum allowed size (15 MB).")
+        return v
+
 
 # --------------------------------------------------------------------------- #
 # Static Asset Mounts
@@ -288,24 +298,7 @@ async def _handle_websocket_connection(websocket: WebSocket) -> None:
     # Immediately push full system telemetry upon connect
     try:
         status = await asyncio.to_thread(get_system_status)
-        await websocket.send_json({
-            "type": "telemetry",
-            "gpus": status.get("gpus", []),
-            "model": {
-                "is_ready": status.get("model_ready", False),
-                "is_downloading": status.get("model_downloading", False),
-                "status_label": status.get("model_status_label", "missing"),
-                "model_size_gib": status.get("model_size_gib", 0.0),
-                "total_size_gib": status.get("model_total_gib", 0.0),
-                "download_percent": status.get("model_download_percent", 0),
-                "download_progress_label": status.get("model_download_label", ""),
-                "missing_components": status.get("missing_components", []),
-            },
-            "disk": status.get("disk", {}),
-            "recommended_device_mapping": status.get("recommended_device_mapping", {}),
-            "download": engine_manager.download_job.to_dict(),
-            "active_job": engine_manager.active_job.to_dict() if engine_manager.active_job else None,
-        })
+        await websocket.send_json(engine_manager.build_telemetry_payload(status, "telemetry"))
     except Exception as exc:
         logger.debug(f"Initial telemetry push error: {exc}")
 
@@ -314,25 +307,7 @@ async def _handle_websocket_connection(websocket: WebSocket) -> None:
             data = await websocket.receive_text()
             if data == "ping":
                 status = await asyncio.to_thread(get_system_status)
-                await websocket.send_json({
-                    "type": "pong",
-                    "timestamp": datetime.now().isoformat(),
-                    "gpus": status.get("gpus", []),
-                    "model": {
-                        "is_ready": status.get("model_ready", False),
-                        "is_downloading": status.get("model_downloading", False),
-                        "status_label": status.get("model_status_label", "missing"),
-                        "model_size_gib": status.get("model_size_gib", 0.0),
-                        "total_size_gib": status.get("model_total_gib", 0.0),
-                        "download_percent": status.get("model_download_percent", 0),
-                        "download_progress_label": status.get("model_download_label", ""),
-                        "missing_components": status.get("missing_components", []),
-                    },
-                    "disk": status.get("disk", {}),
-                    "recommended_device_mapping": status.get("recommended_device_mapping", {}),
-                    "download": engine_manager.download_job.to_dict(),
-                    "active_job": engine_manager.active_job.to_dict() if engine_manager.active_job else None,
-                })
+                await websocket.send_json(engine_manager.build_telemetry_payload(status, "pong"))
     except WebSocketDisconnect:
         pass
     except Exception as exc:

@@ -181,16 +181,17 @@ def cmd_smoke_test(args: argparse.Namespace) -> None:
 
     from app.pipeline import get_pipeline
 
+    draft_cfg = PRESETS["draft_16_9"]
     pipe = get_pipeline()
     result = pipe.generate_video(
         prompt=test_prompt,
-        width=832,
-        height=480,
-        num_frames=33,  # Fast draft frame count
-        num_inference_steps=20,
-        guidance_scale=5.0,
+        width=draft_cfg["width"],
+        height=draft_cfg["height"],
+        num_frames=draft_cfg["default_frames"],
+        num_inference_steps=draft_cfg["recommended_steps"],
+        guidance_scale=DEFAULT_CFG,
         seed=42,
-        fps=16,
+        fps=DEFAULT_FPS,
     )
     print("\n[OK] Smoke test PASSED!")
     print(f"     Generated: {result['video_path']}")
@@ -198,89 +199,13 @@ def cmd_smoke_test(args: argparse.Namespace) -> None:
 
 def cmd_convert_bf16(args: argparse.Namespace) -> None:
     """Convert local text_encoder and transformer safetensors shards from float32 to bfloat16 in-place."""
-    import gc
-    import shutil
-    import torch
-    from safetensors import safe_open
-    from safetensors.torch import save_file
+    from app.system_info import convert_model_shards_to_bf16
 
     print("=" * 60)
     print("  CrazyVideoGenerator — In-Place bfloat16 Model Optimizer")
     print("=" * 60)
 
-    for sub in ["text_encoder", "transformer"]:
-        sub_dir = MODEL_DIR / sub
-        if not sub_dir.exists():
-            print(f"[!] Directory missing: {sub_dir}")
-            continue
-
-        shards = sorted(sub_dir.glob("*.safetensors"))
-        total_sub_bytes = 0
-        for shard in shards:
-            old_mb = round(shard.stat().st_size / (1024 * 1024), 1)
-            tensors = {}
-            metadata = {}
-            needs_conversion = False
-            with safe_open(str(shard), framework="pt", device="cpu") as f:
-                meta = f.metadata()
-                if meta:
-                    metadata = dict(meta)
-                for k in f.keys():
-                    t = f.get_tensor(k)
-                    if t.dtype == torch.float32:
-                        t = t.to(torch.bfloat16)
-                        needs_conversion = True
-                    tensors[k] = t
-
-            if not needs_conversion:
-                print(f"[*] {sub}/{shard.name}: Already bfloat16 ({old_mb} MB)")
-                total_sub_bytes += shard.stat().st_size
-                del tensors
-                gc.collect()
-                continue
-
-            tmp_path = shard.with_suffix(".bf16.tmp")
-            print(f"[*] Converting {sub}/{shard.name} ({old_mb} MB) -> bfloat16...")
-            save_file(tensors, str(tmp_path), metadata=metadata or {"format": "pt"})
-            del tensors
-            gc.collect()
-
-            tmp_path.replace(shard)
-            new_size = shard.stat().st_size
-            total_sub_bytes += new_size
-            new_mb = round(new_size / (1024 * 1024), 1)
-            print(f"    [OK] {sub}/{shard.name}: {old_mb} MB -> {new_mb} MB")
-
-        # Update .index.json total_size metadata if present
-        for idx_file in sub_dir.glob("*.index.json"):
-            try:
-                with open(idx_file, "r", encoding="utf-8") as fp:
-                    idx_data = json.load(fp)
-                if "metadata" in idx_data and "total_size" in idx_data["metadata"]:
-                    idx_data["metadata"]["total_size"] = total_sub_bytes
-                    with open(idx_file, "w", encoding="utf-8") as fp:
-                        json.dump(idx_data, fp, indent=2)
-            except Exception as exc:
-                print(f"[!] Warning updating {idx_file.name}: {exc}")
-
-        # Update config.json torch_dtype if present
-        cfg_file = sub_dir / "config.json"
-        if cfg_file.exists():
-            try:
-                with open(cfg_file, "r", encoding="utf-8") as fp:
-                    cfg_data = json.load(fp)
-                if cfg_data.get("torch_dtype") == "float32":
-                    cfg_data["torch_dtype"] = "bfloat16"
-                    with open(cfg_file, "w", encoding="utf-8") as fp:
-                        json.dump(cfg_data, fp, indent=2)
-            except Exception:
-                pass
-
-    # Clean HuggingFace download cache directory if present
-    cache_dir = MODEL_DIR / ".cache"
-    if cache_dir.exists():
-        shutil.rmtree(cache_dir, ignore_errors=True)
-        print("[*] Cleaned .cache directory.")
+    convert_model_shards_to_bf16(MODEL_DIR, progress_cb=lambda msg: print(f"[*] {msg}"))
 
     mstat = check_model_files(max_age_sec=0.0)
     print("=" * 60)

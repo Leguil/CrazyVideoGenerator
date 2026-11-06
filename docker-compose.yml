@@ -22,6 +22,7 @@ services:
       - ./outputs:/app/outputs
       - ./brand:/app/brand:ro
       - ./app:/app/app
+      - ./cli.py:/app/cli.py
     deploy:
       resources:
         reservations:

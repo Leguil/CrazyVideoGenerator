@@ -1,7 +1,7 @@
 # Author: François Guillemette
 # CrazyVideoGenerator — CrazyLogix Video Studio
 
-**CrazyVideoGenerator** is a containerized, high-performance web studio for text-to-video synthesis using Alibaba's **Wan2.1-T2V-1.3B** model (`Wan-AI/Wan2.1-T2V-1.3B-Diffusers`). Engineered for dual-GPU workstations (such as dual NVIDIA GeForce RTX 5070 Ti 16 GB cards), it balances intensive 3D diffusion computation with zero-overhead memory partitioning.
+**CrazyVideoGenerator** is a containerized, high-performance web studio for text-to-video and image-to-video synthesis using Alibaba's **Wan2.2-TI2V-5B** model (`Wan-AI/Wan2.2-TI2V-5B-Diffusers`). Engineered for dual-GPU workstations (such as dual NVIDIA GeForce RTX 5070 Ti 16 GB cards), it balances intensive 5B 3D diffusion computation with zero-overhead memory partitioning.
 
 The application follows the official **CrazyLogix Brand Design System** (`brand/tokens.css`) with an explicit opt-in dark theme, the signature CrazyLogix Green accents, and a standardized Two-Tier Application Bar.
 
@@ -23,14 +23,14 @@ The application follows the official **CrazyLogix Brand Design System** (`brand/
       GPU 0 (RTX 5070 Ti)                               GPU 1 (RTX 5070 Ti)
   (Display Adapter + Aux)                           (100% Free Compute Card)
  ─────────────────────────                         ─────────────────────────
-  • UMT5-XXL Text Encoder                           • WanTransformer3DModel
+  • UMT5-XXL Text Encoder                           • WanTransformer3DModel (5B)
   • Prompt Embeddings                               • 3D Video DiT Denoising
-  • 3D Causal VAE Decoder                           • Active Timesteps Loop
+  • Wan2.2 16×16×4 3D VAE                           • T2V & Native I2V Conditioning
   • MP4 / H.264 Video Exporter                      • 0 MB Windows Overhead
 ```
 
-- **GPU 1 (`cuda:1`)**: Receives prompt embeddings and runs the intensive 3D Diffusion Transformer (`WanTransformer3DModel`) through all 30–50 denoising steps. Because GPU 1 has no OS display overhead, it operates with peak throughput and zero memory thrashing.
-- **GPU 0 (`cuda:0`)**: Primary display card handling prompt encoding (`UMT5EncoderModel`), VAE temporal decoding (`AutoencoderKLWan`), web server request routing, and MP4 assembly.
+- **GPU 1 (`cuda:1`)**: Receives prompt and image embeddings and runs the 5B 3D Diffusion Transformer (`WanTransformer3DModel`, ~9.55 GiB in `bfloat16`) through all denoising steps. Because GPU 1 has no OS display overhead, it operates with peak throughput and zero memory thrashing.
+- **GPU 0 (`cuda:0`)**: Primary display card handling prompt encoding (`UMT5EncoderModel`, with automatic CPU offload when display VRAM is constrained), high-compression 16×16×4 3D Causal VAE encoding/decoding (`AutoencoderKLWan`), web server request routing, and MP4 assembly.
 
 ---
 
@@ -39,20 +39,23 @@ The application follows the official **CrazyLogix Brand Design System** (`brand/
 - **CrazyLogix Brand Design System**:
   - Implements `brand/tokens.css` with standard `--cl-*` variables.
   - **Two-Tier Application Bar**:
-    - **Tier 1 (Main Header)**: Brand lockup with `crazylogix_logo.svg`, live dual-GPU VRAM telemetry pills, model readiness badge, light/dark theme switcher, and diagnostics.
-    - **Tier 2 (Action Bar)**: Immediate workflow triggers (*Generate Video*, *Random Seed*, *Reset*, *Download Model*, *Smoke Test*, *Output Gallery*).
+    - **Tier 1 (Main Header)**: Brand lockup (`CrazyLogix - Insanely Simple`) with `crazylogix_logo.svg`, live dual-GPU VRAM telemetry pills, model readiness badge, light/dark theme switcher, and diagnostics.
+    - **Tier 2 (Action Bar)**: Immediate workflow triggers (*Generate Video*, *Reset*, *Smoke Test*, *Output Gallery*).
   - Explicit dark theme selector (`:root[data-theme="dark"]`) synced to `localStorage["crazylogix_theme"]`.
-- **Wan2.1-T2V-1.3B Native Support**:
-  - Native Hugging Face `diffusers` `WanPipeline` integration.
-  - Standard 480p motion presets:
-    - **16:9 Landscape**: $832 \times 480$, 81 frames (~5.0s @ 16 FPS).
-    - **9:16 Portrait**: $480 \times 832$, 81 frames (~5.0s @ 16 FPS).
-    - **1:1 Square**: $624 \times 624$, 65 frames (~4.0s @ 16 FPS).
-    - **4:3 Classic**: $704 \times 544$, 49 frames (~3.0s @ 16 FPS).
-    - **Quick Draft**: $832 \times 480$, 33 frames (~2.0s @ 16 FPS).
+- **Wan2.2-TI2V-5B Text-to-Video & Image-to-Video Support**:
+  - Native Hugging Face `diffusers` `WanPipeline` (T2V) and `WanImageToVideoPipeline` (I2V) integration sharing weights in memory (`0` extra VRAM).
+  - Optional **Starting Image Conditioning** with adjustable **Image Strength** (`0.10`–`1.00`).
+  - Automatic in-place `float32` → `bfloat16` shard optimization after download (reducing disk footprint from ~31.9 GiB to ~22.6 GiB).
+  - 720p HD & 480p motion presets (@ 24 FPS, dimensions divisible by 32):
+    - **720p HD 16:9**: `1280 × 704`, 81 frames (~3.4s @ 24 FPS) or 121 frames (~5.0s @ 24 FPS).
+    - **720p HD 9:16**: `704 × 1280`, 81 frames (~3.4s @ 24 FPS).
+    - **480p Fast 16:9**: `832 × 480`, 81 frames (~3.4s @ 24 FPS).
+    - **480p Fast 9:16**: `480 × 832`, 81 frames (~3.4s @ 24 FPS).
+    - **1:1 Square**: `640 × 640`, 81 frames (~3.4s @ 24 FPS).
+    - **Quick Draft**: `832 × 480`, 33 frames (~1.4s @ 24 FPS).
 - **Interactive Video Studio**:
   - Real-time denoising progress over WebSockets (step counter, speed metrics, ETA, and live dual-GPU VRAM monitors).
-  - Integrated HTML5 hero video player with autoplay, looping, frame-stepping, and direct MP4 export.
+  - Integrated HTML5 hero video player with autoplay, looping, direct MP4 export, and one-click video deletion.
   - Automatic thumbnail generation and JSON metadata sidecars.
   - "Reuse Settings" to instantly restore prompt, seed, dimensions, and CFG into the controls.
   - Slide-over Gallery drawer with recent clips, quick playback, and one-click deletion.
@@ -140,13 +143,16 @@ The included `cli.py` allows diagnostics, model management, and headless video s
 # 1. Inspect hardware, PyTorch, CUDA, and model readiness
 python cli.py doctor
 
-# 2. Download Wan2.1 model checkpoint (~13.5 GB)
+# 2. Download Wan2.2-TI2V-5B model checkpoint (~31.9 GB download -> ~22.6 GB bfloat16)
 python cli.py download
 
-# 3. Generate a video from the command line
-python cli.py generate --prompt "A red fox walking through fresh snow at sunset" --preset landscape_16_9 --steps 35
+# 3. Convert any float32 shards to bfloat16 in-place
+python cli.py convert-bf16
 
-# 4. Run an end-to-end smoke test
+# 4. Generate a video from the command line
+python cli.py generate --prompt "A red fox walking through fresh snow at sunset" --preset hd_16_9 --steps 40
+
+# 5. Run an end-to-end smoke test
 python cli.py smoke-test
 ```
 
@@ -158,11 +164,11 @@ python cli.py smoke-test
 |---|---|---|
 | `/api/status` | `GET` | System health, GPU telemetry, and model status |
 | `/api/presets` | `GET` | List aspect ratios and resolution presets |
-| `/api/generate` | `POST` | Queue a new video generation task |
+| `/api/generate` | `POST` | Queue a new video generation task (T2V or I2V) |
 | `/api/jobs/{id}` | `GET` | Query generation job status |
 | `/api/gallery` | `GET` | List generated video clips and metadata |
 | `/api/gallery/{file}` | `DELETE`| Remove video, thumbnail, and metadata |
-| `/api/model/download` | `POST`| Start background download of Wan2.1 weights |
+| `/api/model/download` | `POST`| Start background download of Wan2.2-TI2V-5B weights |
 | `/ws/generation` | `WS` | Live WebSocket progress, ETA, and GPU metrics |
 
 ---
@@ -171,4 +177,4 @@ python cli.py smoke-test
 
 - **Author**: François Guillemette
 - **Design System**: CrazyLogix Shared Brand System (`brand/tokens.css`)
-- **Base Model**: Alibaba [Wan2.1-T2V-1.3B](https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers)
+- **Base Model**: Alibaba [Wan2.2-TI2V-5B](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers)
