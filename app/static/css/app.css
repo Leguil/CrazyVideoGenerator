@@ -417,6 +417,98 @@ label {
     cursor: pointer;
 }
 
+/* Starting Image Dropzone & Preview */
+.start-image-dropzone {
+    border: 1px dashed var(--cl-border-strong, #475569);
+    background-color: var(--cl-panel-sunken, #0f172a);
+    border-radius: var(--cl-radius-sm, 6px);
+    padding: 0.65rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.start-image-dropzone:hover,
+.start-image-dropzone.drag-over {
+    border-color: var(--cl-accent, #10b981);
+    background-color: var(--cl-accent-soft, rgba(16, 185, 129, 0.08));
+}
+
+.dropzone-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.dropzone-text {
+    font-size: 0.78rem;
+    color: var(--cl-muted, #94a3b8);
+}
+
+.start-image-preview {
+    border: 1px solid var(--cl-border, #334155);
+    background-color: var(--cl-panel-sunken, #0f172a);
+    border-radius: var(--cl-radius-sm, 6px);
+    padding: 0.55rem;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    position: relative;
+}
+
+.start-image-thumb {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--cl-border, #334155);
+    flex-shrink: 0;
+}
+
+.start-image-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.start-image-name {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--cl-text-strong, #f8fafc);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 1.4rem;
+}
+
+.start-image-strength-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.btn-clear-image {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.4rem;
+    background: transparent;
+    border: none;
+    color: var(--cl-muted, #94a3b8);
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 0.15rem 0.3rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-clear-image:hover {
+    color: #f87171;
+    background-color: rgba(239, 68, 68, 0.12);
+}
+
 /* Preset Cards Grid */
 .preset-grid {
     display: grid;

@@ -19,6 +19,7 @@
         lastMetadata: null,
         lastStatus: null,
         currentVideoFile: null,
+        startImageDataUrl: null,
         gallery: [],
         heartbeatTimer: null,
         statusPollTimer: null,
@@ -58,6 +59,14 @@
         // Form Inputs
         promptInput: document.getElementById("promptInput"),
         negPromptInput: document.getElementById("negPromptInput"),
+        inputStartImage: document.getElementById("inputStartImage"),
+        startImageDropzone: document.getElementById("startImageDropzone"),
+        startImagePreview: document.getElementById("startImagePreview"),
+        startImageThumb: document.getElementById("startImageThumb"),
+        startImageName: document.getElementById("startImageName"),
+        btnClearStartImage: document.getElementById("btnClearStartImage"),
+        inputImageStrength: document.getElementById("inputImageStrength"),
+        valImageStrength: document.getElementById("valImageStrength"),
         presetGrid: document.getElementById("presetGrid"),
         inputWidth: document.getElementById("inputWidth"),
         inputHeight: document.getElementById("inputHeight"),
@@ -305,9 +314,70 @@
         el.durationBadge.textContent = `~${duration} sec @ ${fps} FPS`;
     }
 
+    function clearStartImage() {
+        state.startImageDataUrl = null;
+        if (el.inputStartImage) el.inputStartImage.value = "";
+        if (el.startImageThumb) el.startImageThumb.src = "";
+        if (el.startImagePreview) el.startImagePreview.classList.add("hidden");
+        if (el.startImageDropzone) el.startImageDropzone.classList.remove("hidden");
+    }
+
+    function handleStartImageFile(file) {
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            showToast("Please select a valid PNG, JPEG, or WebP image.", "warn");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const dataUrl = ev.target.result;
+            state.startImageDataUrl = dataUrl;
+            if (el.startImageThumb) el.startImageThumb.src = dataUrl;
+            if (el.startImageName) el.startImageName.textContent = file.name;
+            if (el.startImageDropzone) el.startImageDropzone.classList.add("hidden");
+            if (el.startImagePreview) el.startImagePreview.classList.remove("hidden");
+            showToast(`Starting image loaded: ${file.name}`, "info");
+        };
+        reader.readAsDataURL(file);
+    }
+
     function setupFormListeners() {
         el.selectFrames.addEventListener("change", updateDurationBadge);
         el.inputFps.addEventListener("input", updateDurationBadge);
+
+        if (el.startImageDropzone && el.inputStartImage) {
+            el.startImageDropzone.addEventListener("click", () => el.inputStartImage.click());
+            el.inputStartImage.addEventListener("change", (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) handleStartImageFile(file);
+            });
+            el.startImageDropzone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                el.startImageDropzone.classList.add("drag-over");
+            });
+            el.startImageDropzone.addEventListener("dragleave", () => {
+                el.startImageDropzone.classList.remove("drag-over");
+            });
+            el.startImageDropzone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                el.startImageDropzone.classList.remove("drag-over");
+                const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (file) handleStartImageFile(file);
+            });
+        }
+
+        if (el.btnClearStartImage) {
+            el.btnClearStartImage.addEventListener("click", () => {
+                clearStartImage();
+                showToast("Starting image removed", "info");
+            });
+        }
+
+        if (el.inputImageStrength && el.valImageStrength) {
+            el.inputImageStrength.addEventListener("input", (e) => {
+                el.valImageStrength.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
 
         el.inputSteps.addEventListener("input", (e) => {
             el.valSteps.textContent = e.target.value;
@@ -326,6 +396,11 @@
         el.btnReset.addEventListener("click", () => {
             el.promptInput.value = "";
             el.negPromptInput.value = state.defaultNegativePrompt || "";
+            clearStartImage();
+            if (el.inputImageStrength && el.valImageStrength) {
+                el.inputImageStrength.value = "0.85";
+                el.valImageStrength.textContent = "0.85";
+            }
             selectPreset("landscape_16_9");
             el.inputSteps.value = "35";
             el.valSteps.textContent = "35";
@@ -479,6 +554,8 @@
             guidance_scale: parseFloat(el.inputCfg.value),
             seed: parseInt(el.inputSeed.value, 10),
             fps: parseInt(el.inputFps.value, 10),
+            init_image: state.startImageDataUrl || undefined,
+            image_strength: state.startImageDataUrl && el.inputImageStrength ? parseFloat(el.inputImageStrength.value) : undefined,
         };
 
         state.isGenerating = true;

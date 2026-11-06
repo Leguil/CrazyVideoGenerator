@@ -46,6 +46,8 @@ class GenerationJob:
         guidance_scale: float = 5.0,
         seed: int = -1,
         fps: int = 16,
+        init_image: Optional[str] = None,
+        image_strength: float = 0.85,
     ):
         self.job_id = job_id
         self.prompt = prompt
@@ -57,6 +59,8 @@ class GenerationJob:
         self.guidance_scale = guidance_scale
         self.seed = seed
         self.fps = fps
+        self.init_image = init_image
+        self.image_strength = image_strength
 
         self.status: str = "queued"  # queued, running, completed, failed
         self.progress_percent: int = 0
@@ -83,6 +87,8 @@ class GenerationJob:
             "guidance_scale": self.guidance_scale,
             "seed": self.seed,
             "fps": self.fps,
+            "has_init_image": bool(self.init_image),
+            "image_strength": self.image_strength if self.init_image else None,
             "progress_percent": self.progress_percent,
             "current_step": self.current_step,
             "total_steps": self.total_steps,
@@ -165,6 +171,8 @@ class EngineManager:
         guidance_scale: float = 5.0,
         seed: int = -1,
         fps: int = 16,
+        init_image: Optional[str] = None,
+        image_strength: float = 0.85,
     ) -> GenerationJob:
         job_id = str(uuid.uuid4())[:8]
         job = GenerationJob(
@@ -178,6 +186,8 @@ class EngineManager:
             guidance_scale=guidance_scale,
             seed=seed,
             fps=fps,
+            init_image=init_image,
+            image_strength=image_strength,
         )
         self.jobs[job_id] = job
         self._prune_old_jobs()
@@ -336,6 +346,8 @@ class EngineManager:
                     guidance_scale=job.guidance_scale,
                     seed=job.seed,
                     fps=job.fps,
+                    init_image=job.init_image,
+                    image_strength=job.image_strength,
                     progress_callback=on_progress,
                 )
 

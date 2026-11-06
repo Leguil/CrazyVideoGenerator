@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+import io
 import json
 import logging
 import os
@@ -36,9 +38,11 @@ except ImportError:
 try:
     import numpy as np
     from PIL import Image as PILImage
+    from PIL import ImageOps as PILImageOps
 except ImportError:
     np = None
     PILImage = None
+    PILImageOps = None
 
 try:
     import imageio
@@ -179,6 +183,18 @@ class WanDualGpuPipeline:
 
                 pipe.vae.decode = _wrapped_decode
 
+            if hasattr(pipe.vae, "encode"):
+                orig_encode = pipe.vae.encode
+                vae_dev = self.vae_device
+
+                def _wrapped_encode(x: Any, *args: Any, **kwargs: Any) -> Any:
+                    x_dev = self._move_tensors_to_device(x, vae_dev)
+                    new_args = self._move_tensors_to_device(args, vae_dev)
+                    new_kwargs = self._move_tensors_to_device(kwargs, vae_dev)
+                    return orig_encode(x_dev, *new_args, **new_kwargs)
+
+                pipe.vae.encode = _wrapped_encode
+
     def load_model(self) -> None:
         """Load WanPipeline and distribute components to their designated GPUs."""
         if self.pipeline is not None:
@@ -239,6 +255,63 @@ class WanDualGpuPipeline:
         elapsed = round(time.time() - t0, 2)
         logger.info(f"WanPipeline loaded successfully in {elapsed}s.")
 
+    def _encode_init_image(
+        self,
+        init_image: Any,
+        width: int,
+        height: int,
+        exec_dev: Any,
+    ) -> Any:
+        """Decode, resize/crop, and encode a starting image into normalized Wan VAE latent space."""
+        if PILImage is None or torch is None:
+            raise RuntimeError("PIL and PyTorch are required for starting image conditioning.")
+
+        if isinstance(init_image, PILImage.Image):
+            img = init_image
+        elif isinstance(init_image, Path) or (isinstance(init_image, str) and not init_image.startswith("data:") and len(init_image) < 260 and Path(init_image).exists()):
+            img = PILImage.open(init_image)
+        elif isinstance(init_image, str):
+            b64_data = init_image.split(",", 1)[1] if "," in init_image else init_image
+            raw_bytes = base64.b64decode(b64_data)
+            img = PILImage.open(io.BytesIO(raw_bytes))
+        else:
+            raise ValueError("Unsupported init_image format.")
+
+        img = img.convert("RGB")
+        resample = getattr(PILImage, "Resampling", PILImage).LANCZOS
+        if PILImageOps is not None:
+            img = PILImageOps.fit(img, (width, height), method=resample)
+        else:
+            img = img.resize((width, height), resample)
+
+        # Convert RGB [0, 255] -> float32 [-1.0, 1.0] with shape [1, 3, 1, H, W]
+        arr = np.asarray(img, dtype=np.float32) / 127.5 - 1.0
+        vae = self.pipeline.vae
+        vae_dtype = getattr(vae, "dtype", torch.float32)
+        img_tensor = (
+            torch.from_numpy(arr)
+            .permute(2, 0, 1)
+            .unsqueeze(0)
+            .unsqueeze(2)
+            .to(device=self.vae_device, dtype=vae_dtype)
+        )
+
+        with torch.no_grad():
+            enc_out = vae.encode(img_tensor)
+            raw_latent = enc_out.latent_dist.mode()
+
+        latents_mean = (
+            torch.tensor(vae.config.latents_mean, device=exec_dev, dtype=torch.float32)
+            .view(1, vae.config.z_dim, 1, 1, 1)
+        )
+        latents_std = (
+            1.0
+            / torch.tensor(vae.config.latents_std, device=exec_dev, dtype=torch.float32)
+            .view(1, vae.config.z_dim, 1, 1, 1)
+        )
+        first_frame_latent = (raw_latent.to(device=exec_dev, dtype=torch.float32) - latents_mean) * latents_std
+        return first_frame_latent
+
     def generate_video(
         self,
         prompt: str,
@@ -250,6 +323,8 @@ class WanDualGpuPipeline:
         guidance_scale: float = 5.0,
         seed: int = -1,
         fps: int = 16,
+        init_image: Optional[Any] = None,
+        image_strength: float = 0.85,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Generate a video and export MP4, thumbnail, and metadata JSON."""
@@ -275,12 +350,63 @@ class WanDualGpuPipeline:
         meta_path = OUTPUTS_DIR / meta_filename
 
         start_time = time.time()
+        has_init_image = bool(init_image)
+        clamped_strength = float(max(0.1, min(1.0, image_strength if image_strength is not None else 0.85)))
         logger.info(
             f"Starting generation: {width}x{height}, {num_frames} frames, "
-            f"{num_inference_steps} steps, cfg={guidance_scale}, seed={seed}"
+            f"{num_inference_steps} steps, cfg={guidance_scale}, seed={seed}, "
+            f"init_image={has_init_image}" + (f" (strength={clamped_strength})" if has_init_image else "")
         )
 
+        first_frame_latent = None
+        init_noise = None
+        if has_init_image:
+            first_frame_latent = self._encode_init_image(init_image, width, height, exec_dev)
+            vae_scale_temp = getattr(self.pipeline, "vae_scale_factor_temporal", 4)
+            vae_scale_spat = getattr(self.pipeline, "vae_scale_factor_spatial", 8)
+            in_channels = getattr(self.pipeline.transformer.config, "in_channels", 16)
+            num_latent_frames = (num_frames - 1) // vae_scale_temp + 1
+            latent_shape = (
+                1,
+                in_channels,
+                num_latent_frames,
+                height // vae_scale_spat,
+                width // vae_scale_spat,
+            )
+            init_noise = torch.randn(
+                latent_shape,
+                generator=generator,
+                device=exec_dev,
+                dtype=torch.float32,
+            )
+
         def step_callback(pipe_self: Any, step_idx: int, timestep: Any, cb_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+            if first_frame_latent is not None and init_noise is not None and "latents" in cb_kwargs:
+                latents = cb_kwargs["latents"]
+                sigmas = getattr(pipe_self.scheduler, "sigmas", None)
+                if sigmas is not None and (step_idx + 1) < len(sigmas):
+                    sigma_next = float(sigmas[step_idx + 1])
+                else:
+                    sigma_next = 0.0
+
+                # Exact flow-matching trajectory target for the starting image at latent frame 0
+                target_first = (1.0 - sigma_next) * first_frame_latent + sigma_next * init_noise[:, :, :1, :, :]
+                lat_f32 = latents[:, :, :1, :, :].float()
+                latents[:, :, :1, :, :] = (
+                    (1.0 - clamped_strength) * lat_f32 + clamped_strength * target_first
+                ).to(latents.dtype)
+
+                # Soft temporal ramp over latent frames 1..2 during high-noise early steps for smooth motion onset
+                if sigma_next > 0.55 and latents.shape[2] > 1:
+                    max_ramp = min(3, latents.shape[2])
+                    for f_idx in range(1, max_ramp):
+                        w = clamped_strength * (sigma_next - 0.55) * (0.45 ** f_idx)
+                        target_f = (1.0 - sigma_next) * first_frame_latent + sigma_next * init_noise[:, :, f_idx : f_idx + 1, :, :]
+                        cur_f = latents[:, :, f_idx : f_idx + 1, :, :].float()
+                        latents[:, :, f_idx : f_idx + 1, :, :] = ((1.0 - w) * cur_f + w * target_f).to(latents.dtype)
+
+                cb_kwargs["latents"] = latents
+
             if progress_callback:
                 step_num = step_idx + 1
                 percent = int((step_num / num_inference_steps) * 100)
@@ -309,7 +435,9 @@ class WanDualGpuPipeline:
                 "num_inference_steps": num_inference_steps,
                 "generator": generator,
             }
-            if progress_callback is not None:
+            if init_noise is not None:
+                pipe_kwargs["latents"] = init_noise.clone()
+            if progress_callback is not None or first_frame_latent is not None:
                 pipe_kwargs["callback_on_step_end"] = step_callback
 
             output = self.pipeline(**pipe_kwargs)
@@ -343,6 +471,8 @@ class WanDualGpuPipeline:
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
             "seed": seed,
+            "has_init_image": has_init_image,
+            "image_strength": round(clamped_strength, 2) if has_init_image else None,
             "inference_time_seconds": inference_time,
             "created_at": datetime.now().isoformat(),
             "model_id": MODEL_ID,

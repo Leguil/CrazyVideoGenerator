@@ -96,6 +96,8 @@ class GenerateRequest(BaseModel):
     guidance_scale: Optional[float] = Field(DEFAULT_CFG, ge=1.0, le=20.0)
     seed: Optional[int] = Field(-1, description="-1 for random seed")
     fps: Optional[int] = Field(DEFAULT_FPS, ge=8, le=30)
+    init_image: Optional[str] = Field(None, description="Optional base64-encoded starting image")
+    image_strength: Optional[float] = Field(0.85, ge=0.1, le=1.0, description="Starting image conditioning strength")
 
     @field_validator("width", "height")
     @classmethod
@@ -182,6 +184,8 @@ async def api_generate(req: GenerateRequest) -> Dict[str, Any]:
         guidance_scale=req.guidance_scale if req.guidance_scale is not None else DEFAULT_CFG,
         seed=req.seed if req.seed is not None else -1,
         fps=req.fps if req.fps is not None else DEFAULT_FPS,
+        init_image=req.init_image,
+        image_strength=req.image_strength if req.image_strength is not None else 0.85,
     )
 
     return {"status": "queued", "job_id": job.job_id, "job": job.to_dict()}

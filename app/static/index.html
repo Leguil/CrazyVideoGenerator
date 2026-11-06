@@ -18,8 +18,8 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/brand/tokens.css?v=1.0.4">
-    <link rel="stylesheet" href="/static/css/app.css?v=1.0.4">
+    <link rel="stylesheet" href="/brand/tokens.css?v=1.0.5">
+    <link rel="stylesheet" href="/static/css/app.css?v=1.0.5">
     <link rel="icon" type="image/svg+xml" href="/brand/crazylogix_logo.svg">
 </head>
 <body>
@@ -133,6 +133,38 @@
                             class="input-text"
                             placeholder="blurry, distorted, jerky motion, artifacts..."
                         />
+                    </div>
+
+                    <!-- Starting Image Conditioning (Optional) -->
+                    <div class="form-group">
+                        <div class="label-row">
+                            <label for="inputStartImage">Starting Image (Optional)</label>
+                            <span class="helper-text">First-frame guide</span>
+                        </div>
+                        <input
+                            type="file"
+                            id="inputStartImage"
+                            accept="image/png,image/jpeg,image/webp"
+                            class="hidden"
+                        />
+                        <div class="start-image-dropzone" id="startImageDropzone">
+                            <span class="dropzone-icon">🖼</span>
+                            <span class="dropzone-text">Click or drop an image to guide the starting frame</span>
+                        </div>
+                        <div class="start-image-preview hidden" id="startImagePreview">
+                            <img id="startImageThumb" src="" alt="Starting frame preview" class="start-image-thumb" />
+                            <div class="start-image-meta">
+                                <div class="start-image-name" id="startImageName">image.png</div>
+                                <div class="start-image-strength-row">
+                                    <div class="label-row">
+                                        <span class="helper-text">Image Strength</span>
+                                        <span class="val-display" id="valImageStrength">0.85</span>
+                                    </div>
+                                    <input type="range" id="inputImageStrength" min="0.10" max="1.00" step="0.05" value="0.85" class="input-range">
+                                </div>
+                            </div>
+                            <button type="button" class="btn-clear-image" id="btnClearStartImage" title="Remove starting image">✕</button>
+                        </div>
                     </div>
 
                     <!-- Presets Selector Cards -->
@@ -401,6 +433,6 @@
     </div>
 
     <!-- Application Script -->
-    <script src="/static/js/app.js?v=1.0.4"></script>
+    <script src="/static/js/app.js?v=1.0.5"></script>
 </body>
 </html>
