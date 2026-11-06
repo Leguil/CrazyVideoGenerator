@@ -51,12 +51,13 @@ except ImportError:
 
 
 class WanDualGpuPipeline:
-    """Manager for loading and running Wan2.1-T2V-1.3B distributed across dual GPUs."""
+    """Manager for loading and running Wan2.2-TI2V-5B distributed across dual GPUs."""
 
     def __init__(self, model_source: Optional[str] = None, devices: Optional[str] = None):
         self.model_source = model_source or (str(MODEL_DIR) if MODEL_DIR.exists() else MODEL_ID)
         self.devices_str = devices or DEFAULT_DEVICES
         self.pipeline: Any = None
+        self.i2v_pipeline: Any = None
         self.transformer_device: str = "cuda:0"
         self.text_encoder_device: str = "cuda:0"
         self.vae_device: str = "cuda:0"
@@ -130,7 +131,7 @@ class WanDualGpuPipeline:
             return {k: WanDualGpuPipeline._move_tensors_to_device(v, device) for k, v in obj.items()}
         return obj
 
-    def _register_cross_device_hooks(self, pipe: Any) -> None:
+    def _register_cross_device_hooks(self, pipe: Any, i2v_pipe: Any = None) -> None:
         """Configure pipeline execution device and hooks so tensors seamlessly cross GPU boundaries."""
         primary_dev = torch.device(self.transformer_device)
 
@@ -144,6 +145,14 @@ class WanDualGpuPipeline:
 
         pipe.__class__ = _DualGpuWanPipeline
 
+        if i2v_pipe is not None:
+            class _DualGpuWanI2VPipeline(i2v_pipe.__class__):
+                @property
+                def _execution_device(self) -> torch.device:
+                    return primary_dev
+
+            i2v_pipe.__class__ = _DualGpuWanI2VPipeline
+
         for comp_name, target_dev in [
             ("transformer", self.transformer_device),
             ("text_encoder", self.text_encoder_device),
@@ -155,6 +164,12 @@ class WanDualGpuPipeline:
 
             def _make_pre_hook(dev: str):
                 def _pre_hook(mod: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]):
+                    try:
+                        p = next(mod.parameters(), None)
+                        if p is not None and str(p.device) != dev:
+                            mod.to(dev)
+                    except Exception:
+                        pass
                     new_args = self._move_tensors_to_device(args, dev)
                     new_kwargs = self._move_tensors_to_device(kwargs, dev)
                     return new_args, new_kwargs
@@ -162,7 +177,7 @@ class WanDualGpuPipeline:
 
             module.register_forward_pre_hook(_make_pre_hook(target_dev), with_kwargs=True)
 
-        # Enable VAE tiling/slicing if supported to prevent VRAM spikes during 81-frame 3D decoding
+        # Enable VAE tiling/slicing if supported to prevent VRAM spikes during 3D decoding
         if getattr(pipe, "vae", None) is not None:
             if hasattr(pipe.vae, "enable_tiling"):
                 pipe.vae.enable_tiling()
@@ -176,6 +191,15 @@ class WanDualGpuPipeline:
                 def _wrapped_decode(z: Any, *args: Any, **kwargs: Any) -> Any:
                     if torch is not None and torch.cuda.is_available():
                         torch.cuda.empty_cache()
+                        if vae_dev.startswith("cuda") and getattr(pipe, "text_encoder", None) is not None:
+                            try:
+                                free_bytes, _ = torch.cuda.mem_get_info(torch.device(vae_dev))
+                                if free_bytes < int(3.8 * (1024 ** 3)):
+                                    logger.info("Temporarily offloading text_encoder to CPU to free VRAM for 720p VAE decode...")
+                                    pipe.text_encoder.to("cpu")
+                                    torch.cuda.empty_cache()
+                            except Exception:
+                                pass
                     z_dev = self._move_tensors_to_device(z, vae_dev)
                     new_args = self._move_tensors_to_device(args, vae_dev)
                     new_kwargs = self._move_tensors_to_device(kwargs, vae_dev)
@@ -210,14 +234,14 @@ class WanDualGpuPipeline:
             mstat = check_model_files(local_path)
             if not mstat["is_ready"]:
                 raise RuntimeError(
-                    f"Wan2.1 model checkpoint is not complete: {mstat['download_progress_label']}. "
+                    f"Wan2.2 model checkpoint is not complete: {mstat['download_progress_label']}. "
                     f"Missing: {', '.join(mstat['missing_components'])}"
                 )
 
-        logger.info(f"Loading Wan2.1-T2V-1.3B pipeline from: {self.model_source}")
+        logger.info(f"Loading Wan2.2-TI2V-5B pipeline from: {self.model_source}")
         t0 = time.time()
 
-        from diffusers import AutoencoderKLWan, WanPipeline
+        from diffusers import AutoencoderKLWan, WanImageToVideoPipeline, WanPipeline
 
         # 1. Load VAE in float32 for numerical stability
         vae = AutoencoderKLWan.from_pretrained(
@@ -234,26 +258,85 @@ class WanDualGpuPipeline:
             torch_dtype=dtype,
         )
 
+        # Build companion WanImageToVideoPipeline sharing the exact same loaded modules (0 extra VRAM)
+        i2v_pipe = WanImageToVideoPipeline(
+            tokenizer=pipe.tokenizer,
+            text_encoder=pipe.text_encoder,
+            vae=pipe.vae,
+            scheduler=pipe.scheduler,
+            image_processor=getattr(pipe, "image_processor", None),
+            image_encoder=getattr(pipe, "image_encoder", None),
+            transformer=pipe.transformer,
+            transformer_2=getattr(pipe, "transformer_2", None),
+            boundary_ratio=getattr(pipe.config, "boundary_ratio", None),
+            expand_timesteps=bool(getattr(pipe.config, "expand_timesteps", True)),
+        )
+
         # 3. Apply Multi-GPU or Single-GPU component placement
         is_multi_gpu = len({self.transformer_device, self.text_encoder_device, self.vae_device}) > 1
         if is_multi_gpu:
             logger.info(f"Moving transformer to dedicated compute device: {self.transformer_device}")
             pipe.transformer.to(self.transformer_device)
 
-            logger.info(f"Moving text_encoder to auxiliary device: {self.text_encoder_device}")
-            pipe.text_encoder.to(self.text_encoder_device)
-
             logger.info(f"Moving VAE to auxiliary device: {self.vae_device}")
             pipe.vae.to(self.vae_device)
 
-            self._register_cross_device_hooks(pipe)
+            te_dev = self.text_encoder_device
+            if te_dev.startswith("cuda") and torch.cuda.is_available():
+                try:
+                    free_bytes, _ = torch.cuda.mem_get_info(torch.device(te_dev))
+                    free_gib = free_bytes / (1024.0 ** 3)
+                    if free_gib < 11.2:
+                        logger.info(
+                            f"Auxiliary device {te_dev} has {free_gib:.2f} GiB free VRAM (< 11.2 GiB needed for UMT5-XXL). "
+                            f"Keeping text_encoder on CPU to preserve GPU VRAM for 720p VAE & Transformer."
+                        )
+                        te_dev = "cpu"
+                except Exception:
+                    pass
+            self.text_encoder_device = te_dev
+            logger.info(f"Moving text_encoder to device: {self.text_encoder_device}")
+            pipe.text_encoder.to(self.text_encoder_device)
+
+            self._register_cross_device_hooks(pipe, i2v_pipe=i2v_pipe)
         else:
             if self.transformer_device != "cpu" and torch.cuda.is_available():
                 pipe.to(self.transformer_device)
 
         self.pipeline = pipe
+        self.i2v_pipeline = i2v_pipe
         elapsed = round(time.time() - t0, 2)
-        logger.info(f"WanPipeline loaded successfully in {elapsed}s.")
+        logger.info(f"Wan2.2 TI2V-5B pipeline loaded successfully in {elapsed}s.")
+
+    @staticmethod
+    def _prepare_pil_image(init_image: Any, width: int, height: int) -> Any:
+        """Decode and center-crop/resize an input image to exact (width, height)."""
+        if PILImage is None:
+            raise RuntimeError("Pillow is required for starting image conditioning.")
+
+        if isinstance(init_image, PILImage.Image):
+            img = init_image
+        elif isinstance(init_image, Path) or (
+            isinstance(init_image, str)
+            and not init_image.startswith("data:")
+            and len(init_image) < 260
+            and Path(init_image).exists()
+        ):
+            img = PILImage.open(init_image)
+        elif isinstance(init_image, str):
+            b64_data = init_image.split(",", 1)[1] if "," in init_image else init_image
+            raw_bytes = base64.b64decode(b64_data)
+            img = PILImage.open(io.BytesIO(raw_bytes))
+        else:
+            raise ValueError("Unsupported init_image format.")
+
+        img = img.convert("RGB")
+        resample = getattr(PILImage, "Resampling", PILImage).LANCZOS
+        if PILImageOps is not None:
+            img = PILImageOps.fit(img, (width, height), method=resample)
+        else:
+            img = img.resize((width, height), resample)
+        return img
 
     def _encode_init_image(
         self,
@@ -340,7 +423,7 @@ class WanDualGpuPipeline:
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = "".join(c if c.isalnum() else "_" for c in prompt[:25].strip().lower()).strip("_")
-        base_name = f"wan21_{timestamp}_{slug}_{seed}"
+        base_name = f"wan22_{timestamp}_{slug}_{seed}"
         video_filename = f"{base_name}.mp4"
         thumb_filename = f"{base_name}.jpg"
         meta_filename = f"{base_name}.json"
@@ -352,33 +435,43 @@ class WanDualGpuPipeline:
         start_time = time.time()
         has_init_image = bool(init_image)
         clamped_strength = float(max(0.1, min(1.0, image_strength if image_strength is not None else 0.85)))
+        use_native_i2v = bool(
+            has_init_image
+            and self.i2v_pipeline is not None
+            and getattr(self.pipeline.config, "expand_timesteps", False)
+        )
         logger.info(
             f"Starting generation: {width}x{height}, {num_frames} frames, "
             f"{num_inference_steps} steps, cfg={guidance_scale}, seed={seed}, "
-            f"init_image={has_init_image}" + (f" (strength={clamped_strength})" if has_init_image else "")
+            f"init_image={has_init_image}"
+            + (f" (native_i2v={use_native_i2v}, strength={clamped_strength})" if has_init_image else "")
         )
 
+        pil_init_image = None
         first_frame_latent = None
         init_noise = None
         if has_init_image:
-            first_frame_latent = self._encode_init_image(init_image, width, height, exec_dev)
-            vae_scale_temp = getattr(self.pipeline, "vae_scale_factor_temporal", 4)
-            vae_scale_spat = getattr(self.pipeline, "vae_scale_factor_spatial", 8)
-            in_channels = getattr(self.pipeline.transformer.config, "in_channels", 16)
-            num_latent_frames = (num_frames - 1) // vae_scale_temp + 1
-            latent_shape = (
-                1,
-                in_channels,
-                num_latent_frames,
-                height // vae_scale_spat,
-                width // vae_scale_spat,
-            )
-            init_noise = torch.randn(
-                latent_shape,
-                generator=generator,
-                device=exec_dev,
-                dtype=torch.float32,
-            )
+            if use_native_i2v:
+                pil_init_image = self._prepare_pil_image(init_image, width, height)
+            else:
+                first_frame_latent = self._encode_init_image(init_image, width, height, exec_dev)
+                vae_scale_temp = getattr(self.pipeline, "vae_scale_factor_temporal", 4)
+                vae_scale_spat = getattr(self.pipeline, "vae_scale_factor_spatial", 8)
+                in_channels = getattr(self.pipeline.transformer.config, "in_channels", 16)
+                num_latent_frames = (num_frames - 1) // vae_scale_temp + 1
+                latent_shape = (
+                    1,
+                    in_channels,
+                    num_latent_frames,
+                    height // vae_scale_spat,
+                    width // vae_scale_spat,
+                )
+                init_noise = torch.randn(
+                    latent_shape,
+                    generator=generator,
+                    device=exec_dev,
+                    dtype=torch.float32,
+                )
 
         def step_callback(pipe_self: Any, step_idx: int, timestep: Any, cb_kwargs: Dict[str, Any]) -> Dict[str, Any]:
             if first_frame_latent is not None and init_noise is not None and "latents" in cb_kwargs:
@@ -440,7 +533,11 @@ class WanDualGpuPipeline:
             if progress_callback is not None or first_frame_latent is not None:
                 pipe_kwargs["callback_on_step_end"] = step_callback
 
-            output = self.pipeline(**pipe_kwargs)
+            if use_native_i2v and pil_init_image is not None:
+                pipe_kwargs["image"] = pil_init_image
+                output = self.i2v_pipeline(**pipe_kwargs)
+            else:
+                output = self.pipeline(**pipe_kwargs)
             frames = output.frames[0]
         except Exception as exc:
             logger.error(f"Inference error: {exc}", exc_info=True)

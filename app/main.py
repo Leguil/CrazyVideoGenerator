@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="CrazyLogix CrazyVideoGenerator",
-    description="Studio Web Interface for Wan2.1-T2V-1.3B Video Generation with Dual-GPU Orchestration",
+    description="Studio Web Interface for Wan2.2-TI2V-5B Video Generation with Dual-GPU Orchestration",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -101,9 +101,9 @@ class GenerateRequest(BaseModel):
 
     @field_validator("width", "height")
     @classmethod
-    def validate_dimensions_multiple_of_16(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and v % 16 != 0:
-            raise ValueError("Width and height must be multiples of 16.")
+    def validate_dimensions_multiple_of_32(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v % 32 != 0:
+            raise ValueError("Width and height must be multiples of 32 for Wan2.2-VAE.")
         return v
 
     @field_validator("num_frames")
@@ -164,9 +164,9 @@ async def api_generate(req: GenerateRequest) -> Dict[str, Any]:
     mstat = check_model_files()
     if not mstat["is_ready"]:
         if mstat["is_downloading"]:
-            detail = f"Wan2.1 model is currently downloading ({mstat['download_progress_label']}). Please wait for download to finish."
+            detail = f"Wan2.2 model is currently downloading ({mstat['download_progress_label']}). Please wait for download to finish."
         else:
-            detail = "Wan2.1 model checkpoint is not installed. Please click 'Download Model' to fetch weights first."
+            detail = "Wan2.2 model checkpoint is not installed. Please click 'Download Model' to fetch weights first."
         raise HTTPException(status_code=400, detail=detail)
 
     preset_cfg = PRESETS.get(req.preset or DEFAULT_PRESET, PRESETS[DEFAULT_PRESET])

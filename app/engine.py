@@ -223,7 +223,7 @@ class EngineManager:
     def _run_download(self) -> None:
         try:
             from huggingface_hub import snapshot_download
-            from app.system_info import cleanup_orphaned_download_files
+            from app.system_info import cleanup_orphaned_download_files, convert_model_shards_to_bf16
 
             logger.info(f"Cleaning stale download cache and locks before starting download...")
             cleanup_orphaned_download_files(MODEL_DIR)
@@ -251,6 +251,10 @@ class EngineManager:
 
             stop_poller.set()
             poller.join(timeout=3.0)
+
+            logger.info("Optimizing transformer shards to bfloat16 in-place...")
+            self.download_job.message = "Optimizing shards to bfloat16..."
+            convert_model_shards_to_bf16(MODEL_DIR, progress_cb=lambda msg: setattr(self.download_job, "message", msg))
 
             mstat = check_model_files(max_age_sec=0.0, is_active_download=False)
             if mstat["is_ready"]:

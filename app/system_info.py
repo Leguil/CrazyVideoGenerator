@@ -299,7 +299,7 @@ def check_model_files(
         and te_ready
         and vae_ready
         and tok_ready
-        and clean_gib >= 11.0
+        and clean_gib >= 20.0
     )
     status["is_ready"] = is_ready
 
@@ -336,6 +336,70 @@ def check_model_files(
         _last_model_time = now
 
     return status
+
+
+def convert_model_shards_to_bf16(
+    model_path: Optional[Path] = None,
+    progress_cb: Optional[Any] = None,
+) -> None:
+    """Convert any float32 safetensors shards in text_encoder/ and transformer/ to bfloat16 in-place."""
+    import gc
+    import torch
+    from safetensors import safe_open
+    from safetensors.torch import save_file
+
+    path = model_path or MODEL_DIR
+    for sub in ["text_encoder", "transformer"]:
+        sub_dir = path / sub
+        if not sub_dir.exists():
+            continue
+
+        shards = sorted(sub_dir.glob("*.safetensors"))
+        total_sub_bytes = 0
+        for shard in shards:
+            tensors = {}
+            metadata = {}
+            needs_conversion = False
+            with safe_open(str(shard), framework="pt", device="cpu") as f:
+                meta = f.metadata()
+                if meta:
+                    metadata = dict(meta)
+                for k in f.keys():
+                    t = f.get_tensor(k)
+                    if t.dtype == torch.float32:
+                        t = t.to(torch.bfloat16)
+                        needs_conversion = True
+                    tensors[k] = t
+
+            if not needs_conversion:
+                total_sub_bytes += shard.stat().st_size
+                del tensors
+                gc.collect()
+                continue
+
+            if progress_cb:
+                progress_cb(f"Optimizing {sub}/{shard.name} to bfloat16...")
+            tmp_path = shard.with_suffix(".bf16.tmp")
+            save_file(tensors, str(tmp_path), metadata=metadata or {"format": "pt"})
+            del tensors
+            gc.collect()
+            tmp_path.replace(shard)
+            total_sub_bytes += shard.stat().st_size
+
+        for idx_file in sub_dir.glob("*.index.json"):
+            try:
+                with open(idx_file, "r", encoding="utf-8") as fp:
+                    idx_data = json.load(fp)
+                if "metadata" in idx_data and "total_size" in idx_data["metadata"]:
+                    idx_data["metadata"]["total_size"] = total_sub_bytes
+                    with open(idx_file, "w", encoding="utf-8") as fp:
+                        json.dump(idx_data, fp, indent=2)
+            except Exception:
+                pass
+
+    cache_dir = path / ".cache"
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir, ignore_errors=True)
 
 
 def get_disk_usage() -> Dict[str, Any]:

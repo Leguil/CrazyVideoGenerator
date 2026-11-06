@@ -2,7 +2,7 @@
 # Author: François Guillemette
 """
 CrazyVideoGenerator Command-Line Interface (CLI).
-Dual-GPU Wan2.1-T2V-1.3B video synthesis, diagnostics, model downloads, and benchmarks.
+Dual-GPU Wan2.2-TI2V-5B video synthesis, diagnostics, model downloads, and benchmarks.
 """
 
 from __future__ import annotations
@@ -68,8 +68,8 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     else:
         print("    [!] No GPU telemetry returned via nvidia-smi.")
 
-    # 4. Check Wan2.1 Model Checkpoints
-    print("\n[*] Checking Wan2.1 Model Status:")
+    # 4. Check Wan2.2 Model Checkpoints
+    print("\n[*] Checking Wan2.2 Model Status:")
     mstat = check_model_files()
     print(f"    - Model ID: {mstat['model_id']}")
     print(f"    - Target Dir: {mstat['path']}")
@@ -83,7 +83,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
 
 def cmd_download(args: argparse.Namespace) -> None:
-    """Download Wan2.1-T2V-1.3B checkpoint files from Hugging Face."""
+    """Download Wan2.2-TI2V-5B checkpoint files from Hugging Face."""
     print("=" * 60)
     print(f"  Downloading Model: {MODEL_ID}")
     print(f"  Destination: {MODEL_DIR}")
@@ -91,7 +91,7 @@ def cmd_download(args: argparse.Namespace) -> None:
 
     try:
         from huggingface_hub import snapshot_download
-        from app.system_info import cleanup_orphaned_download_files
+        from app.system_info import cleanup_orphaned_download_files, convert_model_shards_to_bf16
 
         print("[*] Cleaning up stale locks and orphaned download cache...")
         cleanup_orphaned_download_files(MODEL_DIR)
@@ -102,8 +102,10 @@ def cmd_download(args: argparse.Namespace) -> None:
             local_dir=str(MODEL_DIR),
             local_dir_use_symlinks=False,
         )
+        print("[*] Optimizing float32 transformer shards to bfloat16 in-place...")
+        convert_model_shards_to_bf16(MODEL_DIR, progress_cb=lambda msg: print(f"    {msg}"))
         elapsed = round(time.time() - t0, 1)
-        print(f"[OK] Download completed successfully in {elapsed}s.")
+        print(f"[OK] Download and optimization completed successfully in {elapsed}s.")
     except Exception as exc:
         print(f"[ERROR] Failed to download model: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -118,7 +120,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
     from app.pipeline import get_pipeline
 
     prompt = args.prompt
-    preset_cfg = PRESETS.get(args.preset or "landscape_16_9", PRESETS["landscape_16_9"])
+    preset_cfg = PRESETS.get(args.preset or "hd_16_9", PRESETS["hd_16_9"])
     width = args.width if args.width is not None else preset_cfg["width"]
     height = args.height if args.height is not None else preset_cfg["height"]
     num_frames = args.frames if args.frames is not None else preset_cfg["default_frames"]
@@ -130,8 +132,8 @@ def cmd_generate(args: argparse.Namespace) -> None:
     if args.preset and args.preset in PRESETS and args.width is None and args.height is None and args.frames is None:
         print(f"[*] Applying preset '{args.preset}': {width}x{height}, {num_frames} frames")
 
-    if width % 16 != 0 or height % 16 != 0:
-        print(f"[ERROR] Width ({width}) and height ({height}) must be multiples of 16.", file=sys.stderr)
+    if width % 32 != 0 or height % 32 != 0:
+        print(f"[ERROR] Width ({width}) and height ({height}) must be multiples of 32.", file=sys.stderr)
         sys.exit(1)
     if num_frames < 17 or (num_frames - 1) % 4 != 0:
         print(f"[ERROR] Frame count ({num_frames}) must satisfy 4k + 1 and be >= 17 (e.g. 17, 33, 49, 65, 81).", file=sys.stderr)
@@ -294,15 +296,15 @@ def main() -> None:
     subparsers.add_parser("doctor", help="Inspect hardware, GPUs, and model checkpoints")
 
     # download
-    subparsers.add_parser("download", help="Download Wan2.1 checkpoint files")
+    subparsers.add_parser("download", help="Download Wan2.2-TI2V-5B checkpoint files")
 
     # generate
     gen_parser = subparsers.add_parser("generate", help="Generate a video from prompt")
     gen_parser.add_argument("-p", "--prompt", required=True, help="Text prompt")
     gen_parser.add_argument("--negative-prompt", default=None, help="Negative prompt")
-    gen_parser.add_argument("--preset", default="landscape_16_9", choices=list(PRESETS.keys()), help="Aspect preset")
-    gen_parser.add_argument("-w", "--width", type=int, default=None, help="Width in pixels (multiple of 16)")
-    gen_parser.add_argument("-H", "--height", type=int, default=None, help="Height in pixels (multiple of 16)")
+    gen_parser.add_argument("--preset", default="hd_16_9", choices=list(PRESETS.keys()), help="Aspect preset")
+    gen_parser.add_argument("-w", "--width", type=int, default=None, help="Width in pixels (multiple of 32)")
+    gen_parser.add_argument("-H", "--height", type=int, default=None, help="Height in pixels (multiple of 32)")
     gen_parser.add_argument("-f", "--frames", type=int, default=None, help="Number of frames (4k+1)")
     gen_parser.add_argument("-s", "--steps", type=int, default=DEFAULT_STEPS, help="Inference steps")
     gen_parser.add_argument("-c", "--cfg", type=float, default=DEFAULT_CFG, help="Guidance scale")

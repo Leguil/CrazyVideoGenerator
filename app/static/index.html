@@ -18,8 +18,8 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/brand/tokens.css?v=1.0.5">
-    <link rel="stylesheet" href="/static/css/app.css?v=1.0.5">
+    <link rel="stylesheet" href="/brand/tokens.css?v=1.0.6">
+    <link rel="stylesheet" href="/static/css/app.css?v=1.0.6">
     <link rel="icon" type="image/svg+xml" href="/brand/crazylogix_logo.svg">
 </head>
 <body>
@@ -33,7 +33,7 @@
                     <img src="/brand/crazylogix_logo.svg" alt="CrazyLogix" class="brand-logo" width="32" height="32">
                     <div class="brand-text">
                         <span class="brand-title">CrazyVideoGenerator</span>
-                        <span class="brand-subtitle">Wan2.1-T2V-1.3B Studio</span>
+                        <span class="brand-subtitle">CrazyLogix - Insanely Simple</span>
                     </div>
                 </a>
             </div>
@@ -85,7 +85,7 @@
                 </button>
             </div>
             <div class="action-bar-right">
-                <button type="button" class="btn btn-secondary hidden" id="btnDownloadModel" title="Download Wan2.1 Checkpoint">
+                <button type="button" class="btn btn-secondary hidden" id="btnDownloadModel" title="Download Wan2.2-TI2V-5B Checkpoint">
                     <span>⬇ Download Model</span>
                 </button>
                 <button type="button" class="btn btn-secondary" id="btnSmokeTest" title="Run Quick Smoke Test">
@@ -179,11 +179,11 @@
                     <div class="form-row">
                         <div class="form-group col-half">
                             <label for="inputWidth">Width</label>
-                            <input type="number" id="inputWidth" class="input-text" value="832" step="16" readonly>
+                            <input type="number" id="inputWidth" class="input-text" value="1280" step="32" readonly>
                         </div>
                         <div class="form-group col-half">
                             <label for="inputHeight">Height</label>
-                            <input type="number" id="inputHeight" class="input-text" value="480" step="16" readonly>
+                            <input type="number" id="inputHeight" class="input-text" value="704" step="32" readonly>
                         </div>
                     </div>
 
@@ -191,14 +191,16 @@
                     <div class="form-group">
                         <div class="label-row">
                             <label for="selectFrames">Frame Sequence (4k + 1)</label>
-                            <span class="helper-badge" id="durationBadge">~5.0 sec @ 16 FPS</span>
+                            <span class="helper-badge" id="durationBadge">~3.4 sec @ 24 FPS</span>
                         </div>
                         <select id="selectFrames" class="input-select">
-                            <option value="81" selected>81 Frames (~5.0s @ 16 FPS) - Recommended</option>
-                            <option value="65">65 Frames (~4.0s @ 16 FPS)</option>
-                            <option value="49">49 Frames (~3.0s @ 16 FPS)</option>
-                            <option value="33">33 Frames (~2.0s @ 16 FPS) - Fast Preview</option>
-                            <option value="17">17 Frames (~1.0s @ 16 FPS) - Draft</option>
+                            <option value="121">121 Frames (~5.0s @ 24 FPS) - Full 5s HD</option>
+                            <option value="97">97 Frames (~4.0s @ 24 FPS)</option>
+                            <option value="81" selected>81 Frames (~3.4s @ 24 FPS) - Recommended</option>
+                            <option value="65">65 Frames (~2.7s @ 24 FPS)</option>
+                            <option value="49">49 Frames (~2.0s @ 24 FPS)</option>
+                            <option value="33">33 Frames (~1.4s @ 24 FPS) - Fast Preview</option>
+                            <option value="17">17 Frames (~0.7s @ 24 FPS) - Draft</option>
                         </select>
                     </div>
 
@@ -207,9 +209,9 @@
                         <div class="form-group col-half">
                             <div class="label-row">
                                 <label for="inputSteps">Steps</label>
-                                <span class="val-display" id="valSteps">35</span>
+                                <span class="val-display" id="valSteps">40</span>
                             </div>
-                            <input type="range" id="inputSteps" min="15" max="50" value="35" class="input-range">
+                            <input type="range" id="inputSteps" min="15" max="50" value="40" class="input-range">
                         </div>
                         <div class="form-group col-half">
                             <div class="label-row">
@@ -231,7 +233,7 @@
                         </div>
                         <div class="form-group col-half">
                             <label for="inputFps">Framerate (FPS)</label>
-                            <input type="number" id="inputFps" class="input-text" value="16" min="8" max="30">
+                            <input type="number" id="inputFps" class="input-text" value="24" min="8" max="30">
                         </div>
                     </div>
 
@@ -243,11 +245,11 @@
                         </div>
                         <div class="card-body-sm">
                             <div class="hardware-row">
-                                <span class="hw-comp">Wan 3D Transformer:</span>
+                                <span class="hw-comp">Wan2.2 5B 3D Transformer:</span>
                                 <span class="hw-dev badge-accent" id="hwTransformerDev">GPU 1 (cuda:1)</span>
                             </div>
                             <div class="hardware-row">
-                                <span class="hw-comp">UMT5 Text Encoder & VAE:</span>
+                                <span class="hw-comp">UMT5 Text Encoder & 16×16 VAE:</span>
                                 <span class="hw-dev badge-neutral" id="hwAuxDev">GPU 0 (cuda:0)</span>
                             </div>
                         </div>
@@ -262,8 +264,8 @@
                     <div class="placeholder-graphic">
                         <div class="camera-icon">🎬</div>
                     </div>
-                    <h3>CrazyLogix Wan2.1 Video Generator</h3>
-                    <p>Enter a prompt on the left and click <strong>Generate Video</strong> to synthesize high-definition motion video.</p>
+                    <h3>CrazyLogix Wan2.2 TI2V-5B Video Studio</h3>
+                    <p>Enter a prompt (and optional starting image) on the left and click <strong>Generate Video</strong> to synthesize 720p/480p motion video.</p>
                     <div class="sample-prompt-chips">
                         <button type="button" class="chip" data-sample="A futuristic neon cyber city in rain, reflections on wet asphalt, cinematic drone shot, smooth motion">
                             🌆 Cyber City
@@ -360,13 +362,13 @@
                         </div>
                     </div>
                     <div class="diag-section">
-                        <h4>Model Status: Wan2.1-T2V-1.3B</h4>
+                        <h4>Model Status: Wan2.2-TI2V-5B</h4>
                         <div id="diagModelInfo">
                             Loading model status...
                         </div>
                         <div class="diag-actions">
                             <button type="button" class="btn btn-primary" id="btnDiagDownload">
-                                ⬇ Download Wan2.1 Weights (~13.5 GB)
+                                ⬇ Download Wan2.2-TI2V-5B Weights (~31.9 GB)
                             </button>
                         </div>
                     </div>
@@ -433,6 +435,6 @@
     </div>
 
     <!-- Application Script -->
-    <script src="/static/js/app.js?v=1.0.5"></script>
+    <script src="/static/js/app.js?v=1.0.6"></script>
 </body>
 </html>

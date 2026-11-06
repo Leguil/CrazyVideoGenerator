@@ -11,7 +11,7 @@
     // ----------------------------------------------------------------------- //
     const state = {
         presets: {},
-        currentPreset: "landscape_16_9",
+        currentPreset: "hd_16_9",
         defaultNegativePrompt: "",
         activeJobId: null,
         isGenerating: false,
@@ -309,7 +309,7 @@
 
     function updateDurationBadge() {
         const frames = parseInt(el.selectFrames.value, 10) || 81;
-        const fps = parseInt(el.inputFps.value, 10) || 16;
+        const fps = parseInt(el.inputFps.value, 10) || 24;
         const duration = (frames / fps).toFixed(1);
         el.durationBadge.textContent = `~${duration} sec @ ${fps} FPS`;
     }
@@ -401,13 +401,13 @@
                 el.inputImageStrength.value = "0.85";
                 el.valImageStrength.textContent = "0.85";
             }
-            selectPreset("landscape_16_9");
-            el.inputSteps.value = "35";
-            el.valSteps.textContent = "35";
+            selectPreset("hd_16_9");
+            el.inputSteps.value = "40";
+            el.valSteps.textContent = "40";
             el.inputCfg.value = "5.0";
             el.valCfg.textContent = "5.0";
             el.inputSeed.value = "-1";
-            el.inputFps.value = "16";
+            el.inputFps.value = "24";
             updateDurationBadge();
             showToast("Settings reset to defaults", "info");
         });
@@ -465,7 +465,7 @@
             el.btnGenerate.className = "btn btn-primary";
             el.btnGenerate.innerHTML = `<span class="btn-icon">▶</span><span>Generate Video</span>`;
             el.btnGenerate.disabled = false;
-            el.btnGenerate.title = "Generate motion video with Wan2.1-T2V-1.3B";
+            el.btnGenerate.title = "Generate motion video with Wan2.2-TI2V-5B";
         } else if (isDownloading) {
             el.btnGenerate.className = "btn btn-secondary btn-downloading-state";
             el.btnGenerate.innerHTML = `<span class="spinner" style="width:13px;height:13px;border-width:2px;display:inline-block;margin-right:6px;border-top-color:#f59e0b;"></span><span>Downloading Model (${escapeHtml(pct)}%)</span>`;
@@ -473,10 +473,10 @@
             el.btnGenerate.title = `Model weights are currently downloading (${progressLabel}). Click for status.`;
         } else {
             el.btnGenerate.className = "btn btn-primary btn-download-model";
-            const btnLabel = pct > 0 ? `Resume Download (${pct}%)` : `Download Model (~13.5 GB)`;
+            const btnLabel = pct > 0 ? `Resume Download (${pct}%)` : `Download Wan2.2 (~31.9 GB)`;
             el.btnGenerate.innerHTML = `<span class="btn-icon">⬇</span><span>${escapeHtml(btnLabel)}</span>`;
             el.btnGenerate.disabled = false;
-            el.btnGenerate.title = "Wan2.1 model checkpoint is missing or incomplete. Click to download from Hugging Face.";
+            el.btnGenerate.title = "Wan2.2-TI2V-5B model checkpoint is missing or incomplete. Click to download from Hugging Face.";
         }
     }
 
@@ -522,7 +522,7 @@
                 if (isDownloading) {
                     showAppDialog({
                         title: "Model Checkpoint Still Downloading",
-                        message: "The Wan2.1-T2V-1.3B video model is currently downloading in the background.",
+                        message: "The Wan2.2-TI2V-5B video model is currently downloading in the background.",
                         details: `Status: ${dlLabel}\nMissing: ${missing.join(", ")}\n\nVideo generation will unlock automatically as soon as all weight shards are downloaded.`,
                         type: "warn",
                     });
@@ -530,7 +530,7 @@
                 } else {
                     const confirmDl = await showAppDialog({
                         title: "Model Checkpoint Required",
-                        message: "The Wan2.1-T2V-1.3B model weights (~13.5 GB) have not been downloaded yet.",
+                        message: "The Wan2.2-TI2V-5B model weights (~31.9 GB download / ~22.6 GB in bf16) have not been downloaded yet.",
                         details: "Would you like to start the background download from Hugging Face now?",
                         type: "confirm",
                         okText: "Download Weights",
@@ -771,29 +771,29 @@
             if (isReady) {
                 el.modelDot.className = "pill-dot dot-active";
                 el.modelStatusText.textContent = "Ready";
-                el.pillModel.title = `Wan2.1-T2V-1.3B Ready (${modelInfo.model_size_gib || "13.5"} GiB loaded)`;
+                el.pillModel.title = `Wan2.2-TI2V-5B Ready (${modelInfo.model_size_gib || "22.6"} GiB loaded)`;
 
                 el.btnDownloadModel.classList.add("hidden");
                 el.btnDownloadModel.innerHTML = `<span>✓ Model Ready</span>`;
                 el.btnDownloadModel.disabled = false;
-                el.btnDiagDownload.innerHTML = `✓ Model Ready (${escapeHtml(modelInfo.model_size_gib || "13.5")} GiB Installed)`;
+                el.btnDiagDownload.innerHTML = `✓ Model Ready (${escapeHtml(modelInfo.model_size_gib || "22.6")} GiB Installed)`;
                 el.btnDiagDownload.disabled = true;
             } else if (isDownloading) {
                 el.modelDot.className = "pill-dot dot-warning";
                 el.modelStatusText.textContent = `Downloading ${pct}%`;
-                el.pillModel.title = `Wan2.1 Checkpoint Downloading: ${progressLabel}`;
+                el.pillModel.title = `Wan2.2 Checkpoint Downloading: ${progressLabel}`;
 
                 el.btnDownloadModel.classList.remove("hidden");
                 el.btnDownloadModel.innerHTML = `<span>⏳ Downloading (${escapeHtml(pct)}%)</span>`;
                 el.btnDownloadModel.disabled = true;
-                el.btnDiagDownload.innerHTML = `⏳ Downloading Wan2.1 Weights... (${escapeHtml(progressLabel)})`;
+                el.btnDiagDownload.innerHTML = `⏳ Downloading Wan2.2-TI2V-5B Weights... (${escapeHtml(progressLabel)})`;
                 el.btnDiagDownload.disabled = true;
             } else {
                 el.btnDownloadModel.classList.remove("hidden");
                 if (pct > 0) {
                     el.modelDot.className = "pill-dot dot-warning";
                     el.modelStatusText.textContent = `Incomplete (${pct}%)`;
-                    el.pillModel.title = `Wan2.1 checkpoint incomplete: ${progressLabel}. Click to resume.`;
+                    el.pillModel.title = `Wan2.2 checkpoint incomplete: ${progressLabel}. Click to resume.`;
 
                     el.btnDownloadModel.innerHTML = `<span>⬇ Resume Download (${escapeHtml(pct)}%)</span>`;
                     el.btnDownloadModel.disabled = false;
@@ -802,11 +802,11 @@
                 } else {
                     el.modelDot.className = "pill-dot dot-danger";
                     el.modelStatusText.textContent = "Missing";
-                    el.pillModel.title = "Wan2.1 checkpoint not found locally. Click to download.";
+                    el.pillModel.title = "Wan2.2-TI2V-5B checkpoint not found locally. Click to download.";
 
                     el.btnDownloadModel.innerHTML = `<span>⬇ Download Model</span>`;
                     el.btnDownloadModel.disabled = false;
-                    el.btnDiagDownload.innerHTML = `⬇ Download Wan2.1 Weights (~13.5 GB)`;
+                    el.btnDiagDownload.innerHTML = `⬇ Download Wan2.2-TI2V-5B Weights (~31.9 GB)`;
                     el.btnDiagDownload.disabled = false;
                 }
             }
@@ -1035,7 +1035,7 @@
                 if (isDownloading) {
                     showAppDialog({
                         title: "Model Checkpoint Downloading",
-                        message: "The Wan2.1-T2V-1.3B video model is currently downloading in the background.",
+                        message: "The Wan2.2-TI2V-5B video model is currently downloading in the background.",
                         details: `Status: ${dlLabel}\nMissing shards: ${missing.join(", ")}\n\nVideo generation will unlock automatically as soon as the download finishes.`,
                         type: "warn",
                     });
@@ -1059,11 +1059,11 @@
             const isResume = pct > 0;
 
             const confirmed = await showAppDialog({
-                title: isResume ? "Resume Wan2.1 Download" : "Download Wan2.1 Checkpoint",
+                title: isResume ? "Resume Wan2.2 Download" : "Download Wan2.2-TI2V-5B Checkpoint",
                 message: isResume
-                    ? `Resume downloading missing Wan2.1-T2V-1.3B weights (${pct}% already downloaded)?`
-                    : "Download Wan2.1-T2V-1.3B weights (~13.5 GB) from Hugging Face in the background?",
-                details: `Repository: Wan-AI/Wan2.1-T2V-1.3B-Diffusers\nHardware: ${hwDesc}\nLocal Directory: ./models/Wan2.1-T2V-1.3B-Diffusers\nMissing shards: ${missing.join(", ") || "None"}`,
+                    ? `Resume downloading missing Wan2.2-TI2V-5B weights (${pct}% already downloaded)?`
+                    : "Download Wan2.2-TI2V-5B weights (~31.9 GB download, auto-optimized to ~22.6 GB bfloat16) from Hugging Face in the background?",
+                details: `Repository: Wan-AI/Wan2.2-TI2V-5B-Diffusers\nHardware: ${hwDesc}\nLocal Directory: ./models/Wan2.2-TI2V-5B-Diffusers\nMissing shards: ${missing.join(", ") || "None"}`,
                 type: "confirm",
                 okText: isResume ? "Resume Download" : "Start Download",
             });
