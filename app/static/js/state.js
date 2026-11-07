@@ -112,14 +112,24 @@ export const el = {
     heroVideo: document.getElementById("heroVideo"),
     videoMetaPrompt: document.getElementById("videoMetaPrompt"),
     videoMetaDetails: document.getElementById("videoMetaDetails"),
+    btnCopyPrompt: document.getElementById("btnCopyPrompt"),
     btnDownloadVideo: document.getElementById("btnDownloadVideo"),
     btnReuseParams: document.getElementById("btnReuseParams"),
     btnViewMetadata: document.getElementById("btnViewMetadata"),
     btnDeleteVideo: document.getElementById("btnDeleteVideo"),
 
-    // Gallery Drawer
-    galleryDrawer: document.getElementById("galleryDrawer"),
-    btnCloseGallery: document.getElementById("btnCloseGallery"),
+    // Synthesis Inspector & Provenance Card
+    metadataCard: document.getElementById("metadataCard"),
+    metaPrompt: document.getElementById("metaPrompt"),
+    metaDims: document.getElementById("metaDims"),
+    metaSeed: document.getElementById("metaSeed"),
+    metaStepsCfg: document.getElementById("metaStepsCfg"),
+    metaElapsed: document.getElementById("metaElapsed"),
+    metaModel: document.getElementById("metaModel"),
+
+    // Generated Outputs Section
+    gallerySection: document.getElementById("gallerySection"),
+    galleryCount: document.getElementById("galleryCount"),
     galleryGrid: document.getElementById("galleryGrid"),
 
     // Modals

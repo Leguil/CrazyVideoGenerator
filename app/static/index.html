@@ -18,8 +18,8 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/brand/tokens.css?v=1.0.6">
-    <link rel="stylesheet" href="/static/css/app.css?v=1.0.6">
+    <link rel="stylesheet" href="/brand/tokens.css?v=1.2.0">
+    <link rel="stylesheet" href="/static/css/app.css?v=1.2.0">
     <link rel="icon" type="image/svg+xml" href="/brand/crazylogix_logo.svg">
 </head>
 <body>
@@ -91,8 +91,8 @@
                 <button type="button" class="btn btn-secondary" id="btnSmokeTest" title="Run Quick Smoke Test">
                     <span>⚡ Smoke Test</span>
                 </button>
-                <button type="button" class="btn btn-secondary" id="btnToggleGallery" title="Toggle Video Output Gallery">
-                    <span>📁 Gallery (<span id="galleryCountBadge">0</span>)</span>
+                <button type="button" class="btn btn-secondary" id="btnToggleGallery" title="Jump to Generated Outputs">
+                    <span>🎬 Outputs (<span id="galleryCountBadge">0</span>)</span>
                 </button>
             </div>
         </div>
@@ -257,69 +257,78 @@
                 </form>
             </aside>
 
-            <!-- Center / Right Hero Video Viewport -->
+            <!-- Right Column: Interactive Video Viewer, Inspector & Generated Outputs Strip -->
             <section class="hero-viewport">
-                <!-- Idle State Placeholder -->
-                <div class="hero-placeholder" id="heroPlaceholder">
-                    <div class="placeholder-graphic">
-                        <div class="camera-icon">🎬</div>
-                    </div>
-                    <h3>CrazyLogix Wan2.2 TI2V-5B Video Studio</h3>
-                    <p>Enter a prompt (and optional starting image) on the left and click <strong>Generate Video</strong> to synthesize 720p/480p motion video.</p>
-                    <div class="sample-prompt-chips">
-                        <button type="button" class="chip" data-sample="A futuristic neon cyber city in rain, reflections on wet asphalt, cinematic drone shot, smooth motion">
-                            🌆 Cyber City
-                        </button>
-                        <button type="button" class="chip" data-sample="A fluffy red fox walking through fresh snow in a pine forest, soft sunset lighting, ultra realistic">
-                            🦊 Winter Fox
-                        </button>
-                        <button type="button" class="chip" data-sample="Ink swirling and blooming in crystal clear water, volumetric colors, macro high speed photography">
-                            💧 Macro Ink
-                        </button>
-                    </div>
-                </div>
+                <!-- Card 1: Hero Video Viewer Card -->
+                <div class="viewer-card">
+                    <div class="viewer-canvas">
+                        <!-- Idle State Placeholder -->
+                        <div class="hero-placeholder" id="heroPlaceholder">
+                            <div class="placeholder-graphic">
+                                <div class="camera-icon">🎬</div>
+                            </div>
+                            <h3>CrazyLogix Wan2.2 TI2V-5B Video Studio</h3>
+                            <p>Enter a prompt (and optional starting image) on the left and click <strong>Generate Video</strong> to synthesize 720p/480p motion video.</p>
+                            <div class="sample-prompt-chips">
+                                <button type="button" class="chip" data-sample="A futuristic neon cyber city in rain, reflections on wet asphalt, cinematic drone shot, smooth motion">
+                                    🌆 Cyber City
+                                </button>
+                                <button type="button" class="chip" data-sample="A fluffy red fox walking through fresh snow in a pine forest, soft sunset lighting, ultra realistic">
+                                    🦊 Winter Fox
+                                </button>
+                                <button type="button" class="chip" data-sample="Ink swirling and blooming in crystal clear water, volumetric colors, macro high speed photography">
+                                    💧 Macro Ink
+                                </button>
+                            </div>
+                        </div>
 
-                <!-- Live Generation Overlay -->
-                <div class="generation-overlay hidden" id="generationOverlay">
-                    <div class="progress-box">
-                        <div class="spinner"></div>
-                        <h4 id="genStatusTitle">Synthesizing Video Latents...</h4>
-                        <div class="progress-bar-track">
-                            <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+                        <!-- Active Video Player Container -->
+                        <div class="video-container hidden" id="videoContainer">
+                            <div class="video-wrapper">
+                                <video id="heroVideo" controls loop playsinline>
+                                    Your browser does not support HTML5 video.
+                                </video>
+                            </div>
                         </div>
-                        <div class="progress-metrics">
-                            <span id="metricStep">Step: 0 / 40 (0%)</span>
-                            <span id="metricSpeed">-- s/it</span>
-                            <span id="metricEta">ETA: --s</span>
-                        </div>
-                        <div class="gpu-live-strip" id="liveGpuStrip">
-                            <!-- GPU load bars populated via websocket -->
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Active Video Player Container -->
-                <div class="video-container hidden" id="videoContainer">
-                    <div class="video-wrapper">
-                        <video id="heroVideo" controls autoplay loop playsinline>
-                            Your browser does not support HTML5 video.
-                        </video>
+                        <!-- Live Generation Overlay -->
+                        <div class="generation-overlay hidden" id="generationOverlay">
+                            <div class="progress-box">
+                                <div class="spinner"></div>
+                                <h4 id="genStatusTitle">Synthesizing Video Latents...</h4>
+                                <div class="progress-bar-track">
+                                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+                                </div>
+                                <div class="progress-metrics">
+                                    <span id="metricStep">Step: 0 / 40 (0%)</span>
+                                    <span id="metricSpeed">-- s/it</span>
+                                    <span id="metricEta">ETA: --s</span>
+                                </div>
+                                <div class="gpu-live-strip" id="liveGpuStrip">
+                                    <!-- GPU load bars populated via websocket -->
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <!-- Video Action Toolbar -->
+
+                    <!-- Viewer Bottom Controls Bar -->
                     <div class="video-meta-bar">
                         <div class="video-info">
-                            <span class="video-title" id="videoMetaPrompt">Prompt text...</span>
-                            <span class="video-subinfo" id="videoMetaDetails">1280x704 • 81 Frames • 3.4s</span>
+                            <span class="video-title" id="videoMetaPrompt">No video selected</span>
+                            <span class="video-subinfo" id="videoMetaDetails">Select or generate a video clip</span>
                         </div>
                         <div class="video-actions">
-                            <a id="btnDownloadVideo" class="btn btn-secondary btn-sm" download title="Download MP4 Video">
-                                ⬇ Download MP4
-                            </a>
-                            <button type="button" class="btn btn-secondary btn-sm" id="btnReuseParams" title="Restore parameters into sidebar">
-                                ↺ Reuse Settings
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnReuseParams" title="Copy parameters back into sidebar">
+                                ↺ Reuse
                             </button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnCopyPrompt" title="Copy prompt to clipboard">
+                                📋 Prompt
+                            </button>
+                            <a id="btnDownloadVideo" class="btn btn-secondary btn-sm" download title="Download MP4 Video">
+                                ⬇ MP4
+                            </a>
                             <button type="button" class="btn btn-secondary btn-sm" id="btnViewMetadata" title="View generation JSON">
-                                ℹ Metadata
+                                ℹ JSON
                             </button>
                             <button type="button" class="btn btn-danger-outline btn-sm" id="btnDeleteVideo" title="Delete this video">
                                 🗑 Delete
@@ -327,23 +336,62 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Card 2: Synthesis Inspector & Provenance Card -->
+                <div class="studio-card hidden" id="metadataCard">
+                    <div class="studio-card-header">
+                        <span class="studio-card-title">
+                            <span>ℹ</span>
+                            <span>Synthesis Inspector &amp; Provenance</span>
+                        </span>
+                    </div>
+                    <div class="studio-card-body">
+                        <div class="inspector-grid">
+                            <div class="inspector-prompt-box">
+                                <div class="inspector-label">Prompt</div>
+                                <div id="metaPrompt" class="inspector-value-muted"></div>
+                            </div>
+                            <div>
+                                <div class="inspector-label">Dimensions &amp; Duration</div>
+                                <div id="metaDims" class="inspector-value-muted"></div>
+                            </div>
+                            <div>
+                                <div class="inspector-label">Seed</div>
+                                <div id="metaSeed" class="inspector-value-mono"></div>
+                            </div>
+                            <div>
+                                <div class="inspector-label">Steps &amp; CFG</div>
+                                <div id="metaStepsCfg" class="inspector-value-muted"></div>
+                            </div>
+                            <div>
+                                <div class="inspector-label">Compute Time</div>
+                                <div id="metaElapsed" class="inspector-value-muted"></div>
+                            </div>
+                            <div class="inspector-model-col">
+                                <div class="inspector-label">Model Pipeline</div>
+                                <div id="metaModel" class="inspector-value-accent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Generated Outputs History Strip -->
+                <section id="gallerySection" class="studio-card">
+                    <div class="studio-card-header">
+                        <span class="studio-card-title">
+                            <span>🎬</span>
+                            <span>Generated Outputs</span>
+                        </span>
+                        <span id="galleryCount" class="studio-card-count">0 videos</span>
+                    </div>
+                    <div class="studio-card-body">
+                        <div class="gallery-grid" id="galleryGrid">
+                            <!-- Populated dynamically with video thumbnails -->
+                        </div>
+                    </div>
+                </section>
             </section>
         </main>
-
-        <!-- ============================================================= -->
-        <!-- GALLERY SLIDE-OVER DRAWER                                     -->
-        <!-- ============================================================= -->
-        <aside class="gallery-drawer" id="galleryDrawer">
-            <div class="drawer-header">
-                <h3>Output Video Gallery</h3>
-                <button type="button" class="btn-close" id="btnCloseGallery" aria-label="Close Gallery">&times;</button>
-            </div>
-            <div class="drawer-body">
-                <div class="gallery-grid" id="galleryGrid">
-                    <!-- Populated dynamically with video cards -->
-                </div>
-            </div>
-        </aside>
 
         <!-- ============================================================= -->
         <!-- SYSTEM DIAGNOSTICS & MODEL MANAGER MODAL                      -->
@@ -435,6 +483,6 @@
     </div>
 
     <!-- Application Script (ES Module) -->
-    <script type="module" src="/static/js/app.js?v=1.1.0"></script>
+    <script type="module" src="/static/js/app.js?v=1.2.0"></script>
 </body>
 </html>

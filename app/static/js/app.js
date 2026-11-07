@@ -353,14 +353,17 @@ function onJobCompleted(job) {
     const result = job.result || {};
     const meta = result.metadata || {};
     const videoFile = result.video_filename || "";
-    loadVideoIntoHero({
-        video_file: videoFile,
-        video_url: `/outputs/${encodeURIComponent(videoFile)}`,
-        metadata: { ...meta, prompt: meta.prompt || job.prompt },
-    });
+    loadVideoIntoHero(
+        {
+            video_file: videoFile,
+            video_url: `/outputs/${encodeURIComponent(videoFile)}`,
+            metadata: { ...meta, prompt: meta.prompt || job.prompt },
+        },
+        true
+    );
 
     showToast("Video generated successfully!", "success");
-    loadGallery();
+    loadGallery(videoFile);
 }
 
 function finishGeneration(success, errMsg = null) {
@@ -432,13 +435,25 @@ function setupActions() {
         startGeneration();
     });
 
-    // Gallery toggle
-    el.btnToggleGallery.addEventListener("click", () => {
-        el.galleryDrawer.classList.toggle("open");
-    });
-    el.btnCloseGallery.addEventListener("click", () => {
-        el.galleryDrawer.classList.remove("open");
-    });
+    // Scroll to Generated Outputs strip
+    if (el.btnToggleGallery) {
+        el.btnToggleGallery.addEventListener("click", () => {
+            el.gallerySection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+    }
+
+    // Copy Prompt button
+    if (el.btnCopyPrompt) {
+        el.btnCopyPrompt.addEventListener("click", () => {
+            const promptText = state.lastMetadata?.prompt || "";
+            if (!promptText) {
+                showToast("No prompt available to copy", "warn");
+                return;
+            }
+            navigator.clipboard.writeText(promptText);
+            showToast("Prompt copied to clipboard!", "success");
+        });
+    }
 
     // Diagnostics modal: Instant render from cached state, then refresh
     el.diagModalBtn.addEventListener("click", () => {
@@ -532,7 +547,7 @@ document.addEventListener("DOMContentLoaded", () => {
         onJobFailed: (errMsg) => finishGeneration(false, errMsg),
     });
     checkSystemStatus(updateButtonState);
-    loadGallery();
+    loadGallery(true);
 
     // Fallback HTTP polling only when WebSocket is disconnected
     state.statusPollTimer = setInterval(() => {
