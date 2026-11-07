@@ -35,8 +35,10 @@ DEFAULT_DEVICES = os.environ.get("CRAZY_VIDEO_DEVICES", "cuda:1,cuda:0")
 # Generation Defaults
 DEFAULT_STEPS = 40
 DEFAULT_CFG = 5.0
+DEFAULT_FLOW_SHIFT = 5.0
 DEFAULT_FPS = 24
 DEFAULT_FRAMES = 81
+DEFAULT_INTERPOLATOR = "none"  # "none", "rife_2x" (bidirectional motion vector interpolation)
 DEFAULT_PRESET = "hd_16_9"
 DEFAULT_NEGATIVE_PROMPT = (
     "Bright lighting, overexposed, static, low quality, distorted details, "

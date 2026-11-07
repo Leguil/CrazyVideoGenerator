@@ -128,6 +128,8 @@ def cmd_generate(args: argparse.Namespace) -> None:
     cfg = args.cfg
     seed = args.seed
     fps = args.fps
+    lora = args.lora
+    lora_scale = args.lora_scale
 
     if args.preset and args.preset in PRESETS and args.width is None and args.height is None and args.frames is None:
         print(f"[*] Applying preset '{args.preset}': {width}x{height}, {num_frames} frames")
@@ -140,7 +142,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     print(f"[*] Prompt: \"{prompt}\"")
-    print(f"[*] Settings: {width}x{height}, {num_frames} frames @ {fps} FPS, {steps} steps, CFG {cfg}, Seed {seed}")
+    print(f"[*] Settings: {width}x{height}, {num_frames} frames @ {fps} FPS, {steps} steps, CFG {cfg}, Seed {seed}" + (f", LoRA: {lora} ({lora_scale}x)" if lora else ""))
 
     pipe = get_pipeline()
 
@@ -163,6 +165,8 @@ def cmd_generate(args: argparse.Namespace) -> None:
         guidance_scale=cfg,
         seed=seed,
         fps=fps,
+        lora_name=lora,
+        lora_scale=lora_scale,
         progress_callback=on_step,
     )
     print("\n[OK] Video successfully generated:")
@@ -235,6 +239,8 @@ def main() -> None:
     gen_parser.add_argument("-c", "--cfg", type=float, default=DEFAULT_CFG, help="Guidance scale")
     gen_parser.add_argument("--seed", type=int, default=-1, help="Random seed")
     gen_parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Frames per second")
+    gen_parser.add_argument("--lora", default=None, help="LoRA .safetensors filename in models/loras")
+    gen_parser.add_argument("--lora-scale", type=float, default=0.8, help="LoRA adapter scale (0.0 to 2.0, default 0.8)")
 
     # smoke-test
     subparsers.add_parser("smoke-test", help="Run rapid end-to-end smoke test")

@@ -78,18 +78,64 @@ def to_uint8_array(frame: Any) -> Any:
     return np.asarray(frame, dtype=np.uint8)
 
 
-def export_frames_to_mp4(frames: Any, output_path: Path, fps: int = DEFAULT_FPS) -> None:
-    """Export list of PIL Images or NumPy arrays to an optimized web MP4."""
+def export_frames_to_mp4(
+    frames: Any,
+    output_path: Path,
+    fps: int = DEFAULT_FPS,
+    interpolator: str = "none",
+) -> None:
+    """Export list of PIL Images or NumPy arrays to an optimized web MP4.
+    
+    If interpolator is 'rife_2x' or 'motion_2x', applies motion-compensated frame interpolation
+    via FFmpeg's minterpolate filter to double the frame rate (e.g. 24 -> 48 fps) for ultra-smooth motion.
+    """
     frame_arrays = [to_uint8_array(f) for f in frames]
+    target_fps = int(fps)
+
+    # Use a temporary intermediate path if interpolation is requested
+    write_target = output_path if interpolator in ("none", "", None) else output_path.with_name(f"raw_{output_path.name}")
 
     # Write video with H.264 web-compatible profile (imageio-ffmpeg sets -pix_fmt yuv420p by default)
     imageio.mimwrite(
-        str(output_path),
+        str(write_target),
         frame_arrays,
-        fps=fps,
+        fps=target_fps,
         codec="libx264",
         output_params=["-crf", "19", "-preset", "medium"],
     )
+
+    if interpolator in ("rife_2x", "motion_2x", "interpolate_2x"):
+        import subprocess
+        smooth_fps = target_fps * 2
+        logger.info(f"Applying 2x motion-compensated frame interpolation: {target_fps} fps -> {smooth_fps} fps...")
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(write_target),
+            "-filter:v",
+            f"minterpolate='fps={smooth_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1'",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "19",
+            "-preset",
+            "fast",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode == 0:
+            try:
+                write_target.unlink()
+            except Exception:
+                pass
+            logger.info(f"Frame interpolation complete -> {output_path} ({smooth_fps} fps)")
+        else:
+            logger.warning(f"FFmpeg interpolation error (falling back to raw video): {res.stderr}")
+            if write_target != output_path and write_target.exists():
+                write_target.replace(output_path)
 
 
 def save_thumbnail(frame: Any, thumb_path: Path) -> None:

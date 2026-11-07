@@ -15,8 +15,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from app.config import (
     DEFAULT_CFG,
     DEFAULT_DEVICES,
+    DEFAULT_FLOW_SHIFT,
     DEFAULT_FPS,
     DEFAULT_FRAMES,
+    DEFAULT_INTERPOLATOR,
     DEFAULT_NEGATIVE_PROMPT,
     DEFAULT_PRESET,
     DEFAULT_STEPS,
@@ -431,15 +433,32 @@ class WanDualGpuPipeline:
                     nk = "diffusion_model." + nk
                 normalized_sd[nk] = v
 
+            # Load LoRA into transformer via diffusers
             self.pipeline.load_lora_weights(normalized_sd, adapter_name="active_lora")
+
+            # Ensure all newly instantiated adapter parameters in transformer match the designated transformer device
             if self.transformer_device != "cpu" and torch is not None and torch.cuda.is_available():
                 self.pipeline.transformer.to(
                     device=self.transformer_device,
                     dtype=self.pipeline.transformer.dtype,
                 )
+
+            # Mirror adapter registration to i2v_pipeline if instantiated
+            if self.i2v_pipeline is not None and hasattr(self.i2v_pipeline, "_lora_loadable_modules"):
+                try:
+                    if hasattr(self.i2v_pipeline, "set_adapters"):
+                        self.i2v_pipeline.set_adapters(["active_lora"], adapter_weights=[clamped_scale])
+                except Exception as exc:
+                    logger.debug(f"Note: i2v_pipeline adapter mirror notice: {exc}")
+
             self.active_lora_name = lora_path.name
 
         self.pipeline.set_adapters(["active_lora"], adapter_weights=[clamped_scale])
+        if self.i2v_pipeline is not None and hasattr(self.i2v_pipeline, "set_adapters"):
+            try:
+                self.i2v_pipeline.set_adapters(["active_lora"], adapter_weights=[clamped_scale])
+            except Exception:
+                pass
         self.active_lora_scale = clamped_scale
         logger.info(f"Active LoRA set: {self.active_lora_name} @ scale {self.active_lora_scale}")
 
@@ -454,6 +473,8 @@ class WanDualGpuPipeline:
         guidance_scale: float = DEFAULT_CFG,
         seed: int = -1,
         fps: int = DEFAULT_FPS,
+        flow_shift: float = DEFAULT_FLOW_SHIFT,
+        interpolator: str = DEFAULT_INTERPOLATOR,
         init_image: Optional[Any] = None,
         image_strength: float = 0.85,
         lora_name: Optional[str] = None,
@@ -465,6 +486,17 @@ class WanDualGpuPipeline:
             self.load_model()
 
         self._apply_lora(lora_name, lora_scale)
+
+        # Apply custom flow-matching shift to scheduler if modified
+        clamped_shift = float(max(1.0, min(16.0, flow_shift if flow_shift is not None else DEFAULT_FLOW_SHIFT)))
+        sched = getattr(self.pipeline, "scheduler", None)
+        if sched is not None and hasattr(sched.config, "flow_shift"):
+            if getattr(sched.config, "flow_shift", None) != clamped_shift:
+                sched.config.flow_shift = clamped_shift
+                logger.info(f"Updated scheduler flow_shift to {clamped_shift}")
+        if self.i2v_pipeline is not None and hasattr(getattr(self.i2v_pipeline, "scheduler", None), "config"):
+            if getattr(self.i2v_pipeline.scheduler.config, "flow_shift", None) != clamped_shift:
+                self.i2v_pipeline.scheduler.config.flow_shift = clamped_shift
 
         if seed is None or seed < 0:
             seed = int(torch.randint(0, 2147483647, (1,)).item()) if torch else int(time.time())
@@ -634,13 +666,15 @@ class WanDualGpuPipeline:
         inference_time = round(time.time() - start_time, 2)
         logger.info(f"Denoising completed in {inference_time}s. Exporting MP4...")
 
-        # Export frames to MP4 using imageio
-        self._export_frames_to_mp4(frames, video_path, fps=fps)
+        # Export frames to MP4 using imageio (with optional 2x frame interpolation)
+        self._export_frames_to_mp4(frames, video_path, fps=fps, interpolator=interpolator)
 
         # Generate and save thumbnail from middle frame
         mid_idx = len(frames) // 2
         mid_frame = frames[mid_idx]
         self._save_thumbnail(mid_frame, thumb_path)
+
+        effective_fps = fps * 2 if interpolator in ("rife_2x", "motion_2x", "interpolate_2x") else fps
 
         # Build and write metadata sidecar
         metadata = {
@@ -650,6 +684,9 @@ class WanDualGpuPipeline:
             "height": height,
             "num_frames": num_frames,
             "fps": fps,
+            "effective_fps": effective_fps,
+            "interpolator": interpolator,
+            "flow_shift": clamped_shift,
             "duration_seconds": round(num_frames / fps, 2),
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,

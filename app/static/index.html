@@ -171,14 +171,14 @@
                     <div class="form-group">
                         <div class="label-row">
                             <label for="selectLora">LoRA Adapter (Optional)</label>
-                            <span class="helper-link" id="btnOpenLoraModal" title="Download community LoRAs from Hugging Face">🧩 Get LoRAs</span>
+                            <div style="display:flex;align-items:center;gap:0.6rem;">
+                                <span class="helper-link" id="btnRefreshLoras" title="Rescan ./models/loras folder">🔄 Rescan</span>
+                                <span class="helper-link" id="btnOpenLoraModal" title="Download community LoRAs from Hugging Face">🧩 Get LoRAs</span>
+                            </div>
                         </div>
-                        <div class="input-with-icon">
-                            <select id="selectLora" class="input-select">
-                                <option value="none">None (Base Wan2.2-TI2V-5B)</option>
-                            </select>
-                            <button type="button" class="input-icon-btn" id="btnRefreshLoras" title="Rescan ./models/loras folder">↻</button>
-                        </div>
+                        <select id="selectLora" class="input-select">
+                            <option value="none">None (Base Wan2.2-TI2V-5B)</option>
+                        </select>
                         <div class="lora-scale-row hidden" id="loraScaleGroup" style="margin-top:0.45rem;">
                             <div class="label-row">
                                 <span class="helper-text">LoRA Strength</span>
@@ -240,6 +240,29 @@
                                 <span class="val-display" id="valCfg">5.0</span>
                             </div>
                             <input type="range" id="inputCfg" min="1.0" max="10.0" step="0.5" value="5.0" class="input-range">
+                            <div class="cfg-preset-row" style="display:flex;gap:0.35rem;margin-top:0.35rem;">
+                                <button type="button" class="btn btn-secondary btn-xs cfg-btn" data-cfg="2.5" style="flex:1;padding:0.15rem 0.35rem;font-size:0.7rem;">Low (2.5)</button>
+                                <button type="button" class="btn btn-secondary btn-xs cfg-btn active" data-cfg="5.0" style="flex:1;padding:0.15rem 0.35rem;font-size:0.7rem;">Balanced (5.0)</button>
+                                <button type="button" class="btn btn-secondary btn-xs cfg-btn" data-cfg="7.5" style="flex:1;padding:0.15rem 0.35rem;font-size:0.7rem;">High (7.5)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flow-Matching Shift & Motion Interpolation -->
+                    <div class="form-row">
+                        <div class="form-group col-half">
+                            <div class="label-row">
+                                <label for="inputFlowShift">Shift</label>
+                                <span class="val-display" id="valFlowShift">5.0</span>
+                            </div>
+                            <input type="range" id="inputFlowShift" min="1.0" max="14.0" step="0.5" value="5.0" class="input-range" title="Flow-matching schedule shift. Higher values (6-10) prioritize high-noise detail and sharp anatomy.">
+                        </div>
+                        <div class="form-group col-half">
+                            <label for="selectInterpolator">Interpolator</label>
+                            <select id="selectInterpolator" class="input-select" title="Post-generation motion interpolation">
+                                <option value="none" selected>None (Native 24 FPS)</option>
+                                <option value="rife_2x">RIFE / Motion 2x (48 FPS Smooth)</option>
+                            </select>
                         </div>
                     </div>
 

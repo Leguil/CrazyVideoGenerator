@@ -18,8 +18,10 @@ from pydantic import BaseModel, Field, field_validator
 from app.config import (
     BRAND_DIR,
     DEFAULT_CFG,
+    DEFAULT_FLOW_SHIFT,
     DEFAULT_FPS,
     DEFAULT_FRAMES,
+    DEFAULT_INTERPOLATOR,
     DEFAULT_NEGATIVE_PROMPT,
     DEFAULT_PRESET,
     DEFAULT_STEPS,
@@ -96,6 +98,8 @@ class GenerateRequest(BaseModel):
     num_frames: Optional[int] = Field(None, ge=17, le=161, description="Number of frames (must be 4k + 1)")
     num_inference_steps: Optional[int] = Field(DEFAULT_STEPS, ge=10, le=100)
     guidance_scale: Optional[float] = Field(DEFAULT_CFG, ge=1.0, le=20.0)
+    flow_shift: Optional[float] = Field(DEFAULT_FLOW_SHIFT, ge=1.0, le=16.0, description="Flow-matching schedule shift (higher = sharper detail)")
+    interpolator: Optional[str] = Field(DEFAULT_INTERPOLATOR, description="Frame interpolator ('none' or 'rife_2x')")
     seed: Optional[int] = Field(-1, description="-1 for random seed")
     fps: Optional[int] = Field(DEFAULT_FPS, ge=8, le=30)
     init_image: Optional[str] = Field(None, description="Optional base64-encoded starting image")
@@ -167,34 +171,58 @@ class LoraDownloadRequest(BaseModel):
     filename: Optional[str] = Field(None, description=".safetensors filename inside the HF repo")
     local_filename: Optional[str] = Field(None, description="Optional local target filename in models/loras")
 
+    @field_validator("repo_id")
+    @classmethod
+    def validate_repo_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v != "":
+            import re
+            cleaned = v.strip()
+            if not re.match(r"^[a-zA-Z0-9_\-\.]+\/[a-zA-Z0-9_\-\.]+$", cleaned):
+                raise ValueError("Invalid Hugging Face repository format. Expected 'username/repository'.")
+            return cleaned
+        return None
+
+    @field_validator("filename", "local_filename")
+    @classmethod
+    def sanitize_filenames(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v != "":
+            clean = Path(v.strip()).name
+            if not clean or clean in (".", ".."):
+                raise ValueError("Invalid filename.")
+            return clean
+        return None
+
 
 @app.get("/api/loras")
 async def api_loras() -> Dict[str, Any]:
-    """List installed .safetensors LoRA files in models/loras and curated HF LoRAs."""
-    LORAS_DIR.mkdir(parents=True, exist_ok=True)
-    installed: List[Dict[str, Any]] = []
-    installed_names = set()
+    """List installed .safetensors LoRA files in models/loras and curated HF LoRAs (non-blocking)."""
+    def _scan_loras() -> Dict[str, Any]:
+        LORAS_DIR.mkdir(parents=True, exist_ok=True)
+        installed: List[Dict[str, Any]] = []
+        installed_names = set()
 
-    for sf in sorted(LORAS_DIR.glob("*.safetensors"), key=lambda p: p.name.lower()):
-        installed_names.add(sf.name)
-        installed.append({
-            "filename": sf.name,
-            "size_mb": round(sf.stat().st_size / (1024 * 1024), 2),
-            "modified_at": datetime.fromtimestamp(sf.stat().st_mtime).isoformat(),
-        })
+        for sf in sorted(LORAS_DIR.glob("*.safetensors"), key=lambda p: p.name.lower()):
+            installed_names.add(sf.name)
+            installed.append({
+                "filename": sf.name,
+                "size_mb": round(sf.stat().st_size / (1024 * 1024), 2),
+                "modified_at": datetime.fromtimestamp(sf.stat().st_mtime).isoformat(),
+            })
 
-    recommended = []
-    for item in RECOMMENDED_LORAS.values():
-        recommended.append({
-            **item,
-            "installed": item["local_filename"] in installed_names or item["filename"] in installed_names,
-        })
+        recommended = []
+        for item in RECOMMENDED_LORAS.values():
+            recommended.append({
+                **item,
+                "installed": item["local_filename"] in installed_names or item["filename"] in installed_names,
+            })
 
-    return {
-        "loras_dir": str(LORAS_DIR),
-        "installed": installed,
-        "recommended": recommended,
-    }
+        return {
+            "loras_dir": str(LORAS_DIR),
+            "installed": installed,
+            "recommended": recommended,
+        }
+
+    return await asyncio.to_thread(_scan_loras)
 
 
 @app.post("/api/loras/download")
@@ -289,6 +317,8 @@ async def api_generate(req: GenerateRequest) -> Dict[str, Any]:
         guidance_scale=req.guidance_scale if req.guidance_scale is not None else DEFAULT_CFG,
         seed=req.seed if req.seed is not None else -1,
         fps=req.fps if req.fps is not None else DEFAULT_FPS,
+        flow_shift=req.flow_shift if req.flow_shift is not None else DEFAULT_FLOW_SHIFT,
+        interpolator=req.interpolator if req.interpolator is not None else DEFAULT_INTERPOLATOR,
         init_image=req.init_image,
         image_strength=req.image_strength if req.image_strength is not None else 0.85,
         lora_name=req.lora_name,

@@ -56,7 +56,11 @@ function renderRecommendedLoras() {
                 <div style="min-width:0;flex:1;">
                     <div style="font-size:0.82rem;font-weight:700;color:var(--cl-text);">${escapeHtml(r.name)}</div>
                     <div style="font-size:0.72rem;color:var(--cl-muted);">${escapeHtml(r.description)}</div>
-                    <div style="font-size:0.68rem;color:var(--cl-accent);font-family:var(--font-mono);margin-top:0.15rem;">${escapeHtml(r.repo_id)}</div>
+                    <div style="font-size:0.68rem;margin-top:0.15rem;">
+                        <a href="https://huggingface.co/${encodeURIComponent(r.repo_id)}" target="_blank" rel="noopener noreferrer" style="color:var(--cl-accent);text-decoration:none;font-family:var(--font-mono);" title="Open Hugging Face Model Card">
+                            ${escapeHtml(r.repo_id)} ↗
+                        </a>
+                    </div>
                 </div>
                 <div>
                     ${
@@ -296,7 +300,31 @@ function setupFormListeners() {
 
     el.inputCfg.addEventListener("input", (e) => {
         el.valCfg.textContent = parseFloat(e.target.value).toFixed(1);
+        updateCfgButtons(parseFloat(e.target.value));
     });
+
+    document.querySelectorAll(".cfg-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const val = parseFloat(btn.dataset.cfg);
+            if (!isNaN(val)) {
+                el.inputCfg.value = String(val);
+                el.valCfg.textContent = val.toFixed(1);
+                updateCfgButtons(val);
+            }
+        });
+    });
+
+    function updateCfgButtons(val) {
+        document.querySelectorAll(".cfg-btn").forEach((b) => {
+            b.classList.toggle("active", Math.abs(parseFloat(b.dataset.cfg) - val) < 0.3);
+        });
+    }
+
+    if (el.inputFlowShift && el.valFlowShift) {
+        el.inputFlowShift.addEventListener("input", (e) => {
+            el.valFlowShift.textContent = parseFloat(e.target.value).toFixed(1);
+        });
+    }
 
     el.btnRandomSeed.addEventListener("click", () => {
         const randomVal = Math.floor(Math.random() * 2147483647);
@@ -357,6 +385,26 @@ function setupFormListeners() {
     el.btnAppDialogOk.addEventListener("click", () => closeAppDialog(true));
     el.btnAppDialogCancel.addEventListener("click", () => closeAppDialog(false));
     el.btnAppDialogClose.addEventListener("click", () => closeAppDialog(false));
+
+    // Global Modal Backdrop Dismiss (Outside Click and Escape key)
+    const allModals = [el.diagModal, el.metaModal, el.loraModal];
+    allModals.forEach((modal) => {
+        if (!modal) return;
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) {
+                modal.classList.add("hidden");
+            }
+        });
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            allModals.forEach((m) => m?.classList.add("hidden"));
+            if (!el.appDialogModal?.classList.contains("hidden")) {
+                closeAppDialog(false);
+            }
+        }
+    });
 }
 
 // ----------------------------------------------------------------------- //
@@ -453,6 +501,8 @@ async function startGeneration(customPayload = null) {
         num_frames: parseInt(el.selectFrames.value, 10),
         num_inference_steps: parseInt(el.inputSteps.value, 10),
         guidance_scale: parseFloat(el.inputCfg.value),
+        flow_shift: el.inputFlowShift ? parseFloat(el.inputFlowShift.value) : 5.0,
+        interpolator: el.selectInterpolator ? el.selectInterpolator.value : "none",
         seed: parseInt(el.inputSeed.value, 10),
         fps: parseInt(el.inputFps.value, 10),
         init_image: state.startImageDataUrl || undefined,
@@ -678,6 +728,13 @@ function setupActions() {
         if (m.guidance_scale !== undefined) {
             el.inputCfg.value = String(m.guidance_scale);
             el.valCfg.textContent = parseFloat(m.guidance_scale).toFixed(1);
+        }
+        if (m.flow_shift !== undefined && el.inputFlowShift && el.valFlowShift) {
+            el.inputFlowShift.value = String(m.flow_shift);
+            el.valFlowShift.textContent = parseFloat(m.flow_shift).toFixed(1);
+        }
+        if (m.interpolator && el.selectInterpolator) {
+            el.selectInterpolator.value = m.interpolator;
         }
         if (m.seed !== undefined) {
             el.inputSeed.value = String(m.seed);

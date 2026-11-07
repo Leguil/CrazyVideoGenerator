@@ -160,6 +160,8 @@ export function loadVideoIntoHero(item, autoPlay = false) {
     const seed = meta.seed ?? "N/A";
     const steps = meta.num_inference_steps ?? "--";
     const cfg = meta.guidance_scale ?? "--";
+    const shiftLabel = meta.flow_shift ? ` • Shift: ${meta.flow_shift}` : "";
+    const interpLabel = meta.interpolator && meta.interpolator !== "none" ? ` • ${meta.effective_fps || (fps * 2)}fps (Interpolated)` : "";
     const elapsed = (meta.generation_time_seconds ?? meta.inference_time_seconds) != null
         ? `${meta.generation_time_seconds ?? meta.inference_time_seconds}s`
         : "--";
@@ -176,7 +178,7 @@ export function loadVideoIntoHero(item, autoPlay = false) {
         if (el.metaPrompt) el.metaPrompt.textContent = meta.prompt || "--";
         if (el.metaDims) el.metaDims.textContent = `${width}×${height} • ${frames}f (${duration}s @ ${fps}fps)`;
         if (el.metaSeed) el.metaSeed.textContent = String(seed);
-        if (el.metaStepsCfg) el.metaStepsCfg.textContent = `${steps} steps / CFG ${cfg}`;
+        if (el.metaStepsCfg) el.metaStepsCfg.textContent = `${steps} steps / CFG ${cfg}${shiftLabel}${interpLabel}`;
         if (el.metaElapsed) el.metaElapsed.textContent = elapsed;
         if (el.metaModel) el.metaModel.textContent = modelName;
     }

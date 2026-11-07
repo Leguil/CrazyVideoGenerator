@@ -46,6 +46,8 @@ class GenerationJob:
         guidance_scale: float = DEFAULT_CFG,
         seed: int = -1,
         fps: int = DEFAULT_FPS,
+        flow_shift: float = DEFAULT_FLOW_SHIFT,
+        interpolator: str = DEFAULT_INTERPOLATOR,
         init_image: Optional[str] = None,
         image_strength: float = 0.85,
         lora_name: Optional[str] = None,
@@ -61,6 +63,8 @@ class GenerationJob:
         self.guidance_scale = guidance_scale
         self.seed = seed
         self.fps = fps
+        self.flow_shift = flow_shift
+        self.interpolator = interpolator
         self.init_image = init_image
         self.has_init_image: bool = bool(init_image)
         self.image_strength = image_strength
@@ -92,6 +96,8 @@ class GenerationJob:
             "guidance_scale": self.guidance_scale,
             "seed": self.seed,
             "fps": self.fps,
+            "flow_shift": self.flow_shift,
+            "interpolator": self.interpolator,
             "has_init_image": self.has_init_image,
             "image_strength": self.image_strength if self.has_init_image else None,
             "lora_name": self.lora_name,
@@ -178,6 +184,8 @@ class EngineManager:
         guidance_scale: float = DEFAULT_CFG,
         seed: int = -1,
         fps: int = DEFAULT_FPS,
+        flow_shift: float = DEFAULT_FLOW_SHIFT,
+        interpolator: str = DEFAULT_INTERPOLATOR,
         init_image: Optional[str] = None,
         image_strength: float = 0.85,
         lora_name: Optional[str] = None,
@@ -195,6 +203,8 @@ class EngineManager:
             guidance_scale=guidance_scale,
             seed=seed,
             fps=fps,
+            flow_shift=flow_shift,
+            interpolator=interpolator,
             init_image=init_image,
             image_strength=image_strength,
             lora_name=lora_name,
@@ -368,6 +378,8 @@ class EngineManager:
                     guidance_scale=job.guidance_scale,
                     seed=job.seed,
                     fps=job.fps,
+                    flow_shift=job.flow_shift,
+                    interpolator=job.interpolator,
                     init_image=job.init_image,
                     image_strength=job.image_strength,
                     lora_name=job.lora_name,
