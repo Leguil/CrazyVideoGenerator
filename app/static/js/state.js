@@ -14,6 +14,8 @@ export const state = {
     lastStatus: null,
     currentVideoFile: null,
     startImageDataUrl: null,
+    loras: [],
+    recommendedLoras: [],
     gallery: [],
     heartbeatTimer: null,
     statusPollTimer: null,
@@ -84,6 +86,12 @@ export const el = {
     btnClearStartImage: document.getElementById("btnClearStartImage"),
     inputImageStrength: document.getElementById("inputImageStrength"),
     valImageStrength: document.getElementById("valImageStrength"),
+    selectLora: document.getElementById("selectLora"),
+    btnRefreshLoras: document.getElementById("btnRefreshLoras"),
+    btnOpenLoraModal: document.getElementById("btnOpenLoraModal"),
+    loraScaleGroup: document.getElementById("loraScaleGroup"),
+    inputLoraScale: document.getElementById("inputLoraScale"),
+    valLoraScale: document.getElementById("valLoraScale"),
     presetGrid: document.getElementById("presetGrid"),
     inputWidth: document.getElementById("inputWidth"),
     inputHeight: document.getElementById("inputHeight"),
@@ -148,6 +156,15 @@ export const el = {
     btnDoneMeta: document.getElementById("btnDoneMeta"),
     btnCopyJson: document.getElementById("btnCopyJson"),
     jsonViewerContent: document.getElementById("jsonViewerContent"),
+
+    // LoRA Manager Modal
+    loraModal: document.getElementById("loraModal"),
+    btnCloseLoraModal: document.getElementById("btnCloseLoraModal"),
+    btnDoneLoraModal: document.getElementById("btnDoneLoraModal"),
+    recommendedLorasList: document.getElementById("recommendedLorasList"),
+    inputCustomLoraRepo: document.getElementById("inputCustomLoraRepo"),
+    inputCustomLoraFile: document.getElementById("inputCustomLoraFile"),
+    btnDownloadCustomLora: document.getElementById("btnDownloadCustomLora"),
 
     // Application Dialog & Toast
     appDialogModal: document.getElementById("appDialogModal"),

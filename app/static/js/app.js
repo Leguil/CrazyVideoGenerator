@@ -9,8 +9,95 @@ import { checkSystemStatus, initWebSocket, renderDiagnostics } from "./telemetry
 import { closeAppDialog, initTheme, showAppDialog, showToast } from "./ui-dialogs.js";
 
 // ----------------------------------------------------------------------- //
-// Presets & Form Sync
+// Presets, LoRAs & Form Sync
 // ----------------------------------------------------------------------- //
+async function loadLoras(selectFilename = null) {
+    try {
+        const res = await fetch("/api/loras");
+        const data = await res.json();
+        state.loras = data.installed || [];
+        state.recommendedLoras = data.recommended || [];
+
+        if (el.selectLora) {
+            const currentVal = selectFilename || el.selectLora.value || "none";
+            el.selectLora.innerHTML =
+                `<option value="none">None (Base Wan2.2-TI2V-5B)</option>` +
+                state.loras
+                    .map(
+                        (l) =>
+                            `<option value="${escapeHtml(l.filename)}">${escapeHtml(l.filename)} (${escapeHtml(l.size_mb)} MB)</option>`
+                    )
+                    .join("");
+            if (state.loras.some((l) => l.filename === currentVal)) {
+                el.selectLora.value = currentVal;
+            } else {
+                el.selectLora.value = "none";
+            }
+            if (el.loraScaleGroup) {
+                el.loraScaleGroup.classList.toggle("hidden", el.selectLora.value === "none");
+            }
+        }
+        renderRecommendedLoras();
+    } catch (err) {
+        console.error("Failed to load LoRAs:", err);
+    }
+}
+
+function renderRecommendedLoras() {
+    if (!el.recommendedLorasList) return;
+    if (!state.recommendedLoras.length) {
+        el.recommendedLorasList.innerHTML = `<div style="font-size:0.8rem;color:var(--cl-muted);">No curated LoRAs configured.</div>`;
+        return;
+    }
+    el.recommendedLorasList.innerHTML = state.recommendedLoras
+        .map(
+            (r) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.6rem 0.75rem;border:1px solid var(--cl-border);border-radius:var(--radius-sm);background:rgba(0,0,0,0.2);">
+                <div style="min-width:0;flex:1;">
+                    <div style="font-size:0.82rem;font-weight:700;color:var(--cl-text);">${escapeHtml(r.name)}</div>
+                    <div style="font-size:0.72rem;color:var(--cl-muted);">${escapeHtml(r.description)}</div>
+                    <div style="font-size:0.68rem;color:var(--cl-accent);font-family:var(--font-mono);margin-top:0.15rem;">${escapeHtml(r.repo_id)}</div>
+                </div>
+                <div>
+                    ${
+                        r.installed
+                            ? `<span class="badge-accent" style="font-size:0.72rem;padding:0.25rem 0.55rem;">✓ Installed</span>`
+                            : `<button type="button" class="btn btn-secondary btn-sm btn-dl-curated-lora" data-preset="${escapeHtml(r.id)}">⬇ Download</button>`
+                    }
+                </div>
+            </div>
+        `
+        )
+        .join("");
+
+    el.recommendedLorasList.querySelectorAll(".btn-dl-curated-lora").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const presetId = btn.dataset.preset;
+            if (!presetId) return;
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "Downloading...";
+            try {
+                const res = await fetch("/api/loras/download", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ preset_id: presetId }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Failed to download LoRA");
+                }
+                showToast(`LoRA downloaded: ${data.filename} (${data.size_mb} MB)`, "success");
+                await loadLoras(data.filename);
+            } catch (err) {
+                showToast("LoRA download failed: " + err.message, "error");
+                btn.disabled = false;
+                btn.textContent = origText;
+            }
+        });
+    });
+}
+
 async function loadPresets() {
     try {
         const res = await fetch("/api/presets");
@@ -136,6 +223,73 @@ function setupFormListeners() {
         });
     }
 
+    if (el.selectLora) {
+        el.selectLora.addEventListener("change", () => {
+            if (el.loraScaleGroup) {
+                el.loraScaleGroup.classList.toggle("hidden", el.selectLora.value === "none");
+            }
+        });
+    }
+
+    if (el.inputLoraScale && el.valLoraScale) {
+        el.inputLoraScale.addEventListener("input", (e) => {
+            el.valLoraScale.textContent = parseFloat(e.target.value).toFixed(2);
+        });
+    }
+
+    if (el.btnRefreshLoras) {
+        el.btnRefreshLoras.addEventListener("click", async () => {
+            await loadLoras();
+            showToast(`LoRA folder rescanned (${state.loras.length} found)`, "info");
+        });
+    }
+
+    if (el.btnOpenLoraModal && el.loraModal) {
+        el.btnOpenLoraModal.addEventListener("click", () => {
+            loadLoras();
+            el.loraModal.classList.remove("hidden");
+        });
+    }
+    if (el.btnCloseLoraModal && el.loraModal) {
+        el.btnCloseLoraModal.addEventListener("click", () => el.loraModal.classList.add("hidden"));
+    }
+    if (el.btnDoneLoraModal && el.loraModal) {
+        el.btnDoneLoraModal.addEventListener("click", () => el.loraModal.classList.add("hidden"));
+    }
+    if (el.btnDownloadCustomLora) {
+        el.btnDownloadCustomLora.addEventListener("click", async () => {
+            const repoId = (el.inputCustomLoraRepo?.value || "").trim();
+            const filename = (el.inputCustomLoraFile?.value || "").trim();
+            if (!repoId) {
+                showToast("Please enter a Hugging Face Repo ID (e.g. user/repo)", "warn");
+                return;
+            }
+            const origText = el.btnDownloadCustomLora.textContent;
+            el.btnDownloadCustomLora.disabled = true;
+            el.btnDownloadCustomLora.textContent = "Fetching...";
+            try {
+                const res = await fetch("/api/loras/download", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ repo_id: repoId, filename: filename || undefined }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Failed to fetch LoRA");
+                }
+                showToast(`Downloaded ${data.filename} (${data.size_mb} MB)`, "success");
+                if (el.inputCustomLoraRepo) el.inputCustomLoraRepo.value = "";
+                if (el.inputCustomLoraFile) el.inputCustomLoraFile.value = "";
+                await loadLoras(data.filename);
+            } catch (err) {
+                showToast("Custom LoRA download error: " + err.message, "error");
+            } finally {
+                el.btnDownloadCustomLora.disabled = false;
+                el.btnDownloadCustomLora.textContent = origText;
+            }
+        });
+    }
+
     el.inputSteps.addEventListener("input", (e) => {
         el.valSteps.textContent = e.target.value;
     });
@@ -157,6 +311,14 @@ function setupFormListeners() {
         if (el.inputImageStrength && el.valImageStrength) {
             el.inputImageStrength.value = "0.85";
             el.valImageStrength.textContent = "0.85";
+        }
+        if (el.selectLora) {
+            el.selectLora.value = "none";
+            if (el.loraScaleGroup) el.loraScaleGroup.classList.add("hidden");
+        }
+        if (el.inputLoraScale && el.valLoraScale) {
+            el.inputLoraScale.value = "0.80";
+            el.valLoraScale.textContent = "0.80";
         }
         selectPreset("hd_16_9");
         el.inputSteps.value = "40";
@@ -295,6 +457,8 @@ async function startGeneration(customPayload = null) {
         fps: parseInt(el.inputFps.value, 10),
         init_image: state.startImageDataUrl || undefined,
         image_strength: state.startImageDataUrl && el.inputImageStrength ? parseFloat(el.inputImageStrength.value) : undefined,
+        lora_name: el.selectLora && el.selectLora.value !== "none" ? el.selectLora.value : undefined,
+        lora_scale: el.selectLora && el.selectLora.value !== "none" && el.inputLoraScale ? parseFloat(el.inputLoraScale.value) : undefined,
     };
 
     state.isGenerating = true;
@@ -518,6 +682,19 @@ function setupActions() {
         if (m.seed !== undefined) {
             el.inputSeed.value = String(m.seed);
         }
+        if (el.selectLora) {
+            if (m.lora_name && state.loras.some((l) => l.filename === m.lora_name)) {
+                el.selectLora.value = m.lora_name;
+                if (el.loraScaleGroup) el.loraScaleGroup.classList.remove("hidden");
+            } else {
+                el.selectLora.value = "none";
+                if (el.loraScaleGroup) el.loraScaleGroup.classList.add("hidden");
+            }
+        }
+        if (m.lora_scale !== undefined && m.lora_scale !== null && el.inputLoraScale && el.valLoraScale) {
+            el.inputLoraScale.value = String(m.lora_scale);
+            el.valLoraScale.textContent = parseFloat(m.lora_scale).toFixed(2);
+        }
         showToast("Parameters restored into sidebar controls!", "success");
     });
 
@@ -537,6 +714,7 @@ function setupActions() {
 document.addEventListener("DOMContentLoaded", () => {
     initTheme();
     loadPresets();
+    loadLoras();
     setupFormListeners();
     setupActions();
     initWebSocket({

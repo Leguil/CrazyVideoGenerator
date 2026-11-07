@@ -23,9 +23,11 @@ from app.config import (
     DEFAULT_NEGATIVE_PROMPT,
     DEFAULT_PRESET,
     DEFAULT_STEPS,
+    LORAS_DIR,
     MODEL_ID,
     OUTPUTS_DIR,
     PRESETS,
+    RECOMMENDED_LORAS,
     SERVER_HOST,
     SERVER_PORT,
     STATIC_DIR,
@@ -98,6 +100,8 @@ class GenerateRequest(BaseModel):
     fps: Optional[int] = Field(DEFAULT_FPS, ge=8, le=30)
     init_image: Optional[str] = Field(None, description="Optional base64-encoded starting image")
     image_strength: Optional[float] = Field(0.85, ge=0.1, le=1.0, description="Starting image conditioning strength")
+    lora_name: Optional[str] = Field(None, description="Optional LoRA .safetensors filename inside models/loras")
+    lora_scale: Optional[float] = Field(0.8, ge=0.0, le=2.0, description="LoRA adapter strength multiplier")
 
     @field_validator("width", "height")
     @classmethod
@@ -157,6 +161,97 @@ async def api_status() -> Dict[str, Any]:
     return await asyncio.to_thread(get_system_status)
 
 
+class LoraDownloadRequest(BaseModel):
+    preset_id: Optional[str] = Field(None, description="Curated LoRA preset ID from RECOMMENDED_LORAS")
+    repo_id: Optional[str] = Field(None, description="Custom Hugging Face repo ID (e.g. user/repo)")
+    filename: Optional[str] = Field(None, description=".safetensors filename inside the HF repo")
+    local_filename: Optional[str] = Field(None, description="Optional local target filename in models/loras")
+
+
+@app.get("/api/loras")
+async def api_loras() -> Dict[str, Any]:
+    """List installed .safetensors LoRA files in models/loras and curated HF LoRAs."""
+    LORAS_DIR.mkdir(parents=True, exist_ok=True)
+    installed: List[Dict[str, Any]] = []
+    installed_names = set()
+
+    for sf in sorted(LORAS_DIR.glob("*.safetensors"), key=lambda p: p.name.lower()):
+        installed_names.add(sf.name)
+        installed.append({
+            "filename": sf.name,
+            "size_mb": round(sf.stat().st_size / (1024 * 1024), 2),
+            "modified_at": datetime.fromtimestamp(sf.stat().st_mtime).isoformat(),
+        })
+
+    recommended = []
+    for item in RECOMMENDED_LORAS.values():
+        recommended.append({
+            **item,
+            "installed": item["local_filename"] in installed_names or item["filename"] in installed_names,
+        })
+
+    return {
+        "loras_dir": str(LORAS_DIR),
+        "installed": installed,
+        "recommended": recommended,
+    }
+
+
+@app.post("/api/loras/download")
+async def api_download_lora(req: LoraDownloadRequest) -> Dict[str, Any]:
+    """Download a Wan2.2-TI2V-5B LoRA from Hugging Face into models/loras."""
+    LORAS_DIR.mkdir(parents=True, exist_ok=True)
+
+    repo_id = (req.repo_id or "").strip()
+    filename = (req.filename or "").strip()
+    local_filename = (req.local_filename or "").strip()
+
+    if req.preset_id and req.preset_id in RECOMMENDED_LORAS:
+        p = RECOMMENDED_LORAS[req.preset_id]
+        repo_id = p["repo_id"]
+        filename = p["filename"]
+        local_filename = p["local_filename"]
+
+    if not repo_id:
+        raise HTTPException(status_code=400, detail="Either preset_id or repo_id is required.")
+
+    def _fetch_lora() -> Dict[str, Any]:
+        import shutil
+        from huggingface_hub import HfApi, hf_hub_download
+
+        target_file = filename
+        if not target_file:
+            api = HfApi()
+            info = api.model_info(repo_id)
+            st_files = [s.rfilename for s in (info.siblings or []) if s.rfilename.endswith(".safetensors")]
+            if not st_files:
+                raise ValueError(f"No .safetensors files found in Hugging Face repository '{repo_id}'.")
+            target_file = st_files[0]
+
+        out_name = Path(local_filename or target_file).name
+        if not out_name.endswith(".safetensors"):
+            out_name += ".safetensors"
+
+        cached_path = hf_hub_download(repo_id=repo_id, filename=target_file)
+        dest_path = LORAS_DIR / out_name
+        shutil.copy2(cached_path, dest_path)
+        size_mb = round(dest_path.stat().st_size / (1024 * 1024), 2)
+        return {
+            "status": "completed",
+            "filename": out_name,
+            "size_mb": size_mb,
+            "repo_id": repo_id,
+        }
+
+    try:
+        return await asyncio.to_thread(_fetch_lora)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to download LoRA from {repo_id}: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to download LoRA: {exc}")
+
+
 @app.get("/api/presets")
 async def api_presets() -> Dict[str, Any]:
     """Return available aspect ratio and resolution presets."""
@@ -196,6 +291,8 @@ async def api_generate(req: GenerateRequest) -> Dict[str, Any]:
         fps=req.fps if req.fps is not None else DEFAULT_FPS,
         init_image=req.init_image,
         image_strength=req.image_strength if req.image_strength is not None else 0.85,
+        lora_name=req.lora_name,
+        lora_scale=req.lora_scale if req.lora_scale is not None else 0.8,
     )
 
     return {"status": "queued", "job_id": job.job_id, "job": job.to_dict()}

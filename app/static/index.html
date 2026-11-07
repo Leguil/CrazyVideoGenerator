@@ -167,6 +167,27 @@
                         </div>
                     </div>
 
+                    <!-- LoRA Fine-Tune Adapter (Optional) -->
+                    <div class="form-group">
+                        <div class="label-row">
+                            <label for="selectLora">LoRA Adapter (Optional)</label>
+                            <span class="helper-link" id="btnOpenLoraModal" title="Download community LoRAs from Hugging Face">🧩 Get LoRAs</span>
+                        </div>
+                        <div class="input-with-icon">
+                            <select id="selectLora" class="input-select">
+                                <option value="none">None (Base Wan2.2-TI2V-5B)</option>
+                            </select>
+                            <button type="button" class="input-icon-btn" id="btnRefreshLoras" title="Rescan ./models/loras folder">↻</button>
+                        </div>
+                        <div class="lora-scale-row hidden" id="loraScaleGroup" style="margin-top:0.45rem;">
+                            <div class="label-row">
+                                <span class="helper-text">LoRA Strength</span>
+                                <span class="val-display" id="valLoraScale">0.80</span>
+                            </div>
+                            <input type="range" id="inputLoraScale" min="0.10" max="1.50" step="0.05" value="0.80" class="input-range">
+                        </div>
+                    </div>
+
                     <!-- Presets Selector Cards -->
                     <div class="form-group">
                         <label>Aspect Ratio & Format</label>
@@ -430,6 +451,51 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btnRefreshDiag">Refresh Telemetry</button>
                     <button type="button" class="btn btn-primary" id="btnDoneDiag">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- COMMUNITY LORA MANAGER MODAL                                  -->
+        <!-- ============================================================= -->
+        <div class="modal-backdrop hidden" id="loraModal">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>🧩 Community LoRA Manager (Wan2.2-TI2V-5B)</h3>
+                    <button type="button" class="btn-close" id="btnCloseLoraModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="diag-section">
+                        <h4>Local LoRA Directory (`./models/loras`)</h4>
+                        <p style="font-size:0.8rem;color:var(--cl-muted);margin:0 0 0.5rem 0;">
+                            Drop any <strong>Wan Video 2.2 TI2V-5B</strong> <code>.safetensors</code> file from Civitai or Hugging Face into <code>./models/loras</code> and click <strong>↻</strong> in the sidebar.
+                        </p>
+                    </div>
+                    <div class="diag-section">
+                        <h4>One-Click Curated Hugging Face LoRAs</h4>
+                        <div id="recommendedLorasList" style="display:flex;flex-direction:column;gap:0.5rem;">
+                            Loading curated LoRAs...
+                        </div>
+                    </div>
+                    <div class="diag-section">
+                        <h4>Download Custom Hugging Face LoRA</h4>
+                        <div class="form-row" style="gap:0.5rem;align-items:flex-end;">
+                            <div class="form-group" style="flex:2;margin:0;">
+                                <label for="inputCustomLoraRepo">HF Repo ID</label>
+                                <input type="text" id="inputCustomLoraRepo" class="input-text" placeholder="e.g. UnifiedHorusRA/wan2.2_5B_lora_lab">
+                            </div>
+                            <div class="form-group" style="flex:2;margin:0;">
+                                <label for="inputCustomLoraFile">Filename (Optional)</label>
+                                <input type="text" id="inputCustomLoraFile" class="input-text" placeholder="Auto-detect .safetensors">
+                            </div>
+                            <button type="button" class="btn btn-primary" id="btnDownloadCustomLora" style="height:36px;">
+                                ⬇ Fetch
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="btnDoneLoraModal">Close</button>
                 </div>
             </div>
         </div>

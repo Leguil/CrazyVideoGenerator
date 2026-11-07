@@ -48,6 +48,8 @@ class GenerationJob:
         fps: int = DEFAULT_FPS,
         init_image: Optional[str] = None,
         image_strength: float = 0.85,
+        lora_name: Optional[str] = None,
+        lora_scale: float = 0.8,
     ):
         self.job_id = job_id
         self.prompt = prompt
@@ -62,6 +64,8 @@ class GenerationJob:
         self.init_image = init_image
         self.has_init_image: bool = bool(init_image)
         self.image_strength = image_strength
+        self.lora_name: Optional[str] = lora_name if lora_name and lora_name != "none" else None
+        self.lora_scale: float = float(lora_scale) if self.lora_name else 0.0
 
         self.status: str = "queued"  # queued, running, completed, failed
         self.progress_percent: int = 0
@@ -90,6 +94,8 @@ class GenerationJob:
             "fps": self.fps,
             "has_init_image": self.has_init_image,
             "image_strength": self.image_strength if self.has_init_image else None,
+            "lora_name": self.lora_name,
+            "lora_scale": self.lora_scale if self.lora_name else None,
             "progress_percent": self.progress_percent,
             "current_step": self.current_step,
             "total_steps": self.total_steps,
@@ -174,6 +180,8 @@ class EngineManager:
         fps: int = DEFAULT_FPS,
         init_image: Optional[str] = None,
         image_strength: float = 0.85,
+        lora_name: Optional[str] = None,
+        lora_scale: float = 0.8,
     ) -> GenerationJob:
         job_id = str(uuid.uuid4())[:8]
         job = GenerationJob(
@@ -189,6 +197,8 @@ class EngineManager:
             fps=fps,
             init_image=init_image,
             image_strength=image_strength,
+            lora_name=lora_name,
+            lora_scale=lora_scale,
         )
         self.jobs[job_id] = job
         self._prune_old_jobs()
@@ -360,6 +370,8 @@ class EngineManager:
                     fps=job.fps,
                     init_image=job.init_image,
                     image_strength=job.image_strength,
+                    lora_name=job.lora_name,
+                    lora_scale=job.lora_scale,
                     progress_callback=on_progress,
                 )
 

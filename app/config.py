@@ -10,12 +10,14 @@ APP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = APP_DIR.parent
 BRAND_DIR = ROOT_DIR / "brand"
 MODELS_DIR = ROOT_DIR / "models"
+LORAS_DIR = MODELS_DIR / "loras"
 OUTPUTS_DIR = ROOT_DIR / "outputs"
 STATIC_DIR = APP_DIR / "static"
 
 # Ensure runtime directories exist
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
+LORAS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Primary Model Configuration
 MODEL_ID = "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
@@ -119,6 +121,46 @@ PRESETS: Dict[str, Dict[str, Any]] = {
 
 # Supported frame counts (Wan2.2 requires 4k + 1)
 VALID_FRAME_COUNTS = [17, 33, 49, 65, 81, 97, 121]
+
+# Curated Hugging Face Community LoRAs for Wan2.2-TI2V-5B
+RECOMMENDED_LORAS: Dict[str, Dict[str, Any]] = {
+    "dmd_4step": {
+        "id": "dmd_4step",
+        "name": "Wan2.2 5B 4-Step DMD Speed LoRA",
+        "repo_id": "Perflow-Shuai/Wan2.2-5B-NonAR-DMD-4Step-LoRA-r64-iter1600",
+        "filename": "adapter_model.safetensors",
+        "local_filename": "wan22_5b_dmd_4step_lora.safetensors",
+        "default_scale": 1.0,
+        "description": "Step-distillation LoRA enabling rapid 4-to-8 step generation on Wan2.2-TI2V-5B.",
+    },
+    "cfg_distill": {
+        "id": "cfg_distill",
+        "name": "Wan2.2 5B CFG-Distilled Speed LoRA",
+        "repo_id": "Perflow-Shuai/Wan2.2-5B-CFG5-to-CFG1-50Step-LoRA-r64-iter250",
+        "filename": "adapter_model.safetensors",
+        "local_filename": "wan22_5b_cfg_distill_lora.safetensors",
+        "default_scale": 1.0,
+        "description": "Distills CFG=5.0 quality into CFG=1.0 (2x faster per step by skipping unconditional pass).",
+    },
+    "hstoric_color": {
+        "id": "hstoric_color",
+        "name": "HSToric Early Color Film LoRA (5B)",
+        "repo_id": "AlekseyCalvin/HSToric_Color_Wan2.2_5B_LoRA_BySilverAgePoets",
+        "filename": "HSToric_color_Wan22_5b_LoRA.safetensors",
+        "local_filename": "HSToric_color_Wan22_5b_LoRA.safetensors",
+        "default_scale": 0.85,
+        "description": "Vintage early 20th-century Autochrome / Prokudin-Gorskii cinema aesthetic.",
+    },
+    "anime_v01": {
+        "id": "anime_v01",
+        "name": "Wan2.2 5B Uncensored Anime Style LoRA",
+        "repo_id": "UnifiedHorusRA/wan2.2_5B_lora_lab",
+        "filename": "wan_2.2_B_anime_v01_000153000.safetensors",
+        "local_filename": "wan22_5b_anime_v01_lora.safetensors",
+        "default_scale": 0.85,
+        "description": "Community uncensored anime aesthetic and character fine-tune for Wan2.2-5B.",
+    },
+}
 
 # Model Profile Registry
 MODEL_PROFILES: Dict[str, Dict[str, Any]] = {

@@ -20,6 +20,7 @@ from app.config import (
     DEFAULT_NEGATIVE_PROMPT,
     DEFAULT_PRESET,
     DEFAULT_STEPS,
+    LORAS_DIR,
     MODEL_DIR,
     MODEL_ID,
     OUTPUTS_DIR,
@@ -58,6 +59,8 @@ class WanDualGpuPipeline:
         self.transformer_device: str = "cuda:0"
         self.text_encoder_device: str = "cuda:0"
         self.vae_device: str = "cuda:0"
+        self.active_lora_name: Optional[str] = None
+        self.active_lora_scale: float = 0.0
         self._configure_devices()
 
     def _configure_devices(self) -> None:
@@ -382,6 +385,64 @@ class WanDualGpuPipeline:
         first_frame_latent = (raw_latent.to(device=exec_dev, dtype=torch.float32) - latents_mean) * latents_std
         return first_frame_latent
 
+    def _apply_lora(self, lora_name: Optional[str], lora_scale: float = 0.8) -> None:
+        """Dynamically load, adjust scale, or unload a Wan2.2-TI2V-5B LoRA adapter."""
+        if self.pipeline is None:
+            return
+
+        clean_name = (lora_name or "").strip()
+        if not clean_name or clean_name.lower() == "none" or lora_scale <= 0.0:
+            if self.active_lora_name is not None:
+                logger.info(f"Unloading active LoRA adapter: {self.active_lora_name}")
+                try:
+                    self.pipeline.unload_lora_weights()
+                except Exception as exc:
+                    logger.warning(f"Error unloading LoRA weights: {exc}")
+                self.active_lora_name = None
+                self.active_lora_scale = 0.0
+            return
+
+        lora_path = (LORAS_DIR / Path(clean_name).name).resolve()
+        if not str(lora_path).startswith(str(LORAS_DIR.resolve())) or not lora_path.exists():
+            raise FileNotFoundError(f"LoRA file '{clean_name}' not found in {LORAS_DIR}")
+
+        clamped_scale = float(max(0.0, min(2.0, lora_scale)))
+        if self.active_lora_name != lora_path.name:
+            if self.active_lora_name is not None:
+                logger.info(f"Unloading previous LoRA adapter '{self.active_lora_name}' before loading '{lora_path.name}'")
+                try:
+                    self.pipeline.unload_lora_weights()
+                except Exception as exc:
+                    logger.warning(f"Error unloading previous LoRA: {exc}")
+                self.active_lora_name = None
+
+            logger.info(f"Loading LoRA adapter '{lora_path.name}' (scale={clamped_scale})...")
+            from safetensors.torch import load_file
+
+            raw_sd = load_file(str(lora_path), device="cpu")
+            normalized_sd: Dict[str, Any] = {}
+            for k, v in raw_sd.items():
+                nk = k
+                if nk.startswith("base_model.model."):
+                    nk = nk[len("base_model.model.") :]
+                if nk.startswith("model.diffusion_model."):
+                    nk = "diffusion_model." + nk[len("model.diffusion_model.") :]
+                elif nk.startswith("blocks.") and (".self_attn." in nk or ".cross_attn." in nk or ".ffn." in nk):
+                    nk = "diffusion_model." + nk
+                normalized_sd[nk] = v
+
+            self.pipeline.load_lora_weights(normalized_sd, adapter_name="active_lora")
+            if self.transformer_device != "cpu" and torch is not None and torch.cuda.is_available():
+                self.pipeline.transformer.to(
+                    device=self.transformer_device,
+                    dtype=self.pipeline.transformer.dtype,
+                )
+            self.active_lora_name = lora_path.name
+
+        self.pipeline.set_adapters(["active_lora"], adapter_weights=[clamped_scale])
+        self.active_lora_scale = clamped_scale
+        logger.info(f"Active LoRA set: {self.active_lora_name} @ scale {self.active_lora_scale}")
+
     def generate_video(
         self,
         prompt: str,
@@ -395,11 +456,15 @@ class WanDualGpuPipeline:
         fps: int = DEFAULT_FPS,
         init_image: Optional[Any] = None,
         image_strength: float = 0.85,
+        lora_name: Optional[str] = None,
+        lora_scale: float = 0.8,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Generate a video and export MP4, thumbnail, and metadata JSON."""
         if self.pipeline is None:
             self.load_model()
+
+        self._apply_lora(lora_name, lora_scale)
 
         if seed is None or seed < 0:
             seed = int(torch.randint(0, 2147483647, (1,)).item()) if torch else int(time.time())
@@ -591,7 +656,11 @@ class WanDualGpuPipeline:
             "seed": seed,
             "has_init_image": has_init_image,
             "image_strength": round(clamped_strength, 2) if has_init_image else None,
+            "generation_mode": "i2v" if has_init_image else "t2v",
+            "lora_name": self.active_lora_name,
+            "lora_scale": round(self.active_lora_scale, 2) if self.active_lora_name else None,
             "inference_time_seconds": inference_time,
+            "generation_time_seconds": inference_time,
             "created_at": datetime.now().isoformat(),
             "model_id": MODEL_ID,
             "video_file": video_filename,

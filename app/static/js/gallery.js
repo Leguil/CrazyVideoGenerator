@@ -160,9 +160,12 @@ export function loadVideoIntoHero(item, autoPlay = false) {
     const seed = meta.seed ?? "N/A";
     const steps = meta.num_inference_steps ?? "--";
     const cfg = meta.guidance_scale ?? "--";
-    const elapsed = meta.generation_time_seconds != null ? `${meta.generation_time_seconds}s` : "--";
-    const modeLabel = meta.generation_mode === "i2v" ? "Image-to-Video (I2V)" : "Text-to-Video (T2V)";
-    const modelName = meta.model_id ? `${meta.model_id} (${modeLabel})` : `Wan2.2-TI2V-5B (${modeLabel})`;
+    const elapsed = (meta.generation_time_seconds ?? meta.inference_time_seconds) != null
+        ? `${meta.generation_time_seconds ?? meta.inference_time_seconds}s`
+        : "--";
+    const modeLabel = meta.generation_mode === "i2v" || meta.has_init_image ? "Image-to-Video (I2V)" : "Text-to-Video (T2V)";
+    const loraSuffix = meta.lora_name ? ` + LoRA: ${meta.lora_name} (${meta.lora_scale ?? 0.8}x)` : "";
+    const modelName = (meta.model_id ? `${meta.model_id} (${modeLabel})` : `Wan2.2-TI2V-5B (${modeLabel})`) + loraSuffix;
 
     el.videoMetaPrompt.textContent = meta.prompt || item.video_file || "Generated Video";
     el.videoMetaDetails.textContent = `${width}×${height} • ${frames} Frames (${duration}s @ ${fps}fps) • Seed: ${seed}`;
